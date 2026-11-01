@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateExam, getGateState, getRelicHint } from './evaluation';
+import { getGateState, getRelicHint } from './evaluation';
+import { evaluateExam } from './examEval';
 import { STANDARD_ANSWERS } from '../data/questionsData';
 import { StationProgress, S3State } from '../types';
 
