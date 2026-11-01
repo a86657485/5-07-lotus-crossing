@@ -1,6 +1,8 @@
 extends Node
 ## Main：World 一图三工位 + UI + Bridge 调度
 
+const ChibiFactoryScr = preload("res://scripts/world/chibi_factory.gd")
+
 const ORANGE := Color("F97316")
 const AMBER := Color("F59E0B")
 const ROAD := Color("4B5563")
@@ -25,6 +27,14 @@ var s2a: Control
 var s2b: Control
 var s2c: Control
 var s3: Control
+
+# 开场世界反馈节点（人流／乱穿／时长闪红）
+var _fx_crowd: Node2D
+var _fx_jay: Node2D
+var _fx_timing: CanvasItem
+var _fx_light_r: CanvasItem
+var _peds: Array = []
+var leader: Node2D
 
 var _intro_frames: Array = [
 	"旁白：莲花山南门这边，开放日人特别多。",
@@ -60,6 +70,8 @@ func _ready() -> void:
 		call_deferred("_smoke_playthrough")
 	if "--shot-s1" in OS.get_cmdline_args() or "--shot-s1" in OS.get_cmdline_user_args():
 		call_deferred("_shot_s1")
+	if "--shot-hub" in OS.get_cmdline_args() or "--shot-hub" in OS.get_cmdline_user_args():
+		call_deferred("_shot_hub")
 
 
 func _start_flow() -> void:
@@ -76,120 +88,365 @@ func _build_world() -> void:
 	world.name = "World"
 	add_child(world)
 
+	# 天空
 	var bg := ColorRect.new()
 	bg.color = SKY
 	bg.size = Vector2(1280, 720)
-	bg.z_index = -10
+	bg.z_index = -20
 	world.add_child(bg)
 
-	# zones: S1 left, HUB center, S3 right, S2 bottom
-	_zone(world, Rect2(40, 80, 360, 280), Color("64748B"), "S1 斑马线引导台")
-	_zone(world, Rect2(460, 60, 360, 260), Color("475569"), "HUB·莲花山南门")
-	_zone(world, Rect2(880, 80, 360, 280), Color("334155"), "S3 信号调度亭")
-	_zone(world, Rect2(200, 380, 880, 260), Color("1E293B"), "S2 信号循环拆解台")
+	# 远景浅城廓／山剪影
+	var hill := Polygon2D.new()
+	hill.color = Color("5B8FB9")
+	hill.polygon = PackedVector2Array([
+		Vector2(0, 90), Vector2(180, 40), Vector2(360, 70), Vector2(520, 30),
+		Vector2(720, 55), Vector2(900, 25), Vector2(1100, 60), Vector2(1280, 35),
+		Vector2(1280, 110), Vector2(0, 110)
+	])
+	hill.z_index = -18
+	world.add_child(hill)
+	var hill2 := Polygon2D.new()
+	hill2.color = Color("6BA3C9")
+	hill2.polygon = PackedVector2Array([
+		Vector2(0, 100), Vector2(220, 70), Vector2(480, 95), Vector2(760, 60),
+		Vector2(1040, 90), Vector2(1280, 70), Vector2(1280, 120), Vector2(0, 120)
+	])
+	hill2.z_index = -17
+	world.add_child(hill2)
 
-	# zebra placeholder
-	var zebra := ColorRect.new()
-	zebra.color = Color(1, 1, 1, 0.85)
-	zebra.position = Vector2(80, 200)
-	zebra.size = Vector2(280, 24)
-	world.add_child(zebra)
+	# 沥青主路（十字）
+	_road(world, Rect2(0, 140, 1280, 220), ROAD)  # 横
+	_road(world, Rect2(480, 120, 320, 520), Color("455066"))  # 纵偏 HUB/S2
+	# 路缘
+	_road(world, Rect2(0, 136, 1280, 6), CURB)
+	_road(world, Rect2(0, 356, 1280, 6), CURB)
 
-	# traffic light placeholder
-	var light := ColorRect.new()
-	light.color = Color("111827")
-	light.position = Vector2(560, 420)
-	light.size = Vector2(40, 120)
-	world.add_child(light)
-	for i in range(3):
-		var lamp := ColorRect.new()
-		lamp.size = Vector2(24, 24)
-		lamp.position = Vector2(568, 432 + i * 36)
-		lamp.color = [Color("EF4444"), Color("F59E0B"), Color("22C55E")][i]
-		world.add_child(lamp)
+	# 分区底板（半透明可读，非纯灰大方块）
+	_zone_pad(world, Rect2(24, 150, 420, 200), Color(0.35, 0.45, 0.55, 0.45), "S1 斑马线引导台", Color("38BDF8"))
+	_zone_pad(world, Rect2(470, 150, 340, 180), Color(0.28, 0.35, 0.42, 0.5), "HUB·莲花山南门", AMBER)
+	_zone_pad(world, Rect2(840, 150, 416, 200), Color(0.22, 0.30, 0.40, 0.5), "S3 信号调度亭", Color("34D399"))
+	_zone_pad(world, Rect2(160, 390, 960, 280), Color(0.18, 0.24, 0.32, 0.55), "S2 信号循环拆解台", ORANGE)
 
-	# thermos
-	var pot := ColorRect.new()
-	pot.color = Color("94A3B8")
-	pot.position = Vector2(620, 200)
-	pot.size = Vector2(36, 56)
-	world.add_child(pot)
+	# S1 斑马线
+	_zebra(world, Vector2(60, 230), 360, 48, 8)
+
+	# S1 人行灯柱
+	_traffic_light(world, Vector2(40, 170), "s1_light")
+
+	# S2 核心大灯柱
+	_traffic_light(world, Vector2(560, 430), "s2_light", true)
+
+	# S2 流程图亭底板
+	var kiosk := ColorRect.new()
+	kiosk.color = Color("1E293B")
+	kiosk.position = Vector2(640, 450)
+	kiosk.size = Vector2(180, 120)
+	world.add_child(kiosk)
+	var kiosk_title := Label.new()
+	kiosk_title.text = "拆解台"
+	kiosk_title.position = Vector2(690, 456)
+	kiosk_title.add_theme_font_size_override("font_size", 16)
+	if UiTheme.ui_font:
+		kiosk_title.add_theme_font_override("font", UiTheme.ui_font)
+	world.add_child(kiosk_title)
+	# 回边琥珀箭头示意
+	var loop_a := Polygon2D.new()
+	loop_a.color = Color(AMBER.r, AMBER.g, AMBER.b, 0.85)
+	loop_a.polygon = PackedVector2Array([
+		Vector2(660, 520), Vector2(780, 520), Vector2(780, 500), Vector2(800, 530),
+		Vector2(780, 560), Vector2(780, 540), Vector2(660, 540)
+	])
+	world.add_child(loop_a)
+
+	# HUB 保温壶桌
+	var table := ColorRect.new()
+	table.color = Color("78716C")
+	table.position = Vector2(600, 250)
+	table.size = Vector2(70, 18)
+	world.add_child(table)
+	if ResourceLoader.exists("res://assets/sprites/props/thermos.png"):
+		var pot_sp := Sprite2D.new()
+		pot_sp.name = "Thermos"
+		pot_sp.texture = load("res://assets/sprites/props/thermos.png")
+		pot_sp.centered = false
+		pot_sp.position = Vector2(610, 190)
+		pot_sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		world.add_child(pot_sp)
+	else:
+		var pot := ColorRect.new()
+		pot.name = "Thermos"
+		pot.color = Color("94A3B8")
+		pot.position = Vector2(618, 210)
+		pot.size = Vector2(28, 44)
+		world.add_child(pot)
+
+	# S3 调度亭 + 时长屏（可闪红）
+	if ResourceLoader.exists("res://assets/sprites/props/dispatch_booth.png"):
+		var booth_sp := Sprite2D.new()
+		booth_sp.name = "DispatchBooth"
+		booth_sp.texture = load("res://assets/sprites/props/dispatch_booth.png")
+		booth_sp.centered = false
+		booth_sp.position = Vector2(930, 175)
+		booth_sp.scale = Vector2(1.6, 1.6)
+		booth_sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		world.add_child(booth_sp)
+	else:
+		var booth := ColorRect.new()
+		booth.color = Color("334155")
+		booth.position = Vector2(920, 180)
+		booth.size = Vector2(160, 110)
+		world.add_child(booth)
+	var screen := ColorRect.new()
+	screen.name = "TimingScreen"
+	screen.color = Color("0F766E")
+	screen.position = Vector2(955, 200)
+	screen.size = Vector2(100, 48)
+	world.add_child(screen)
+	_fx_timing = screen
+	var screen_lab := Label.new()
+	screen_lab.name = "TimingLabel"
+	screen_lab.text = "时长屏"
+	screen_lab.position = Vector2(978, 214)
+	screen_lab.add_theme_font_size_override("font_size", 14)
+	if UiTheme.ui_font:
+		screen_lab.add_theme_font_override("font", UiTheme.ui_font)
+	world.add_child(screen_lab)
+	# 车流条
+	for i in range(5):
+		var car := ColorRect.new()
+		car.color = Color("F87171") if i < 3 else Color("4ADE80")
+		car.position = Vector2(900 + i * 36, 310)
+		car.size = Vector2(28, 14)
+		car.name = "CarFlow_%d" % i
+		world.add_child(car)
+
+	# 行人队列（S1）— 开场人流反馈
+	_fx_crowd = Node2D.new()
+	_fx_crowd.name = "CrowdFX"
+	world.add_child(_fx_crowd)
+	_peds.clear()
+	for i in range(4):
+		var ped := Node2D.new()
+		ped.name = "Ped_%d" % i
+		ped.position = Vector2(100 + i * 42, 270)
+		ChibiFactoryScr.make_pedestrian(ped, [Color("64748B"), Color("94A3B8"), Color("78716C"), Color("57534E")][i])
+		_fx_crowd.add_child(ped)
+		_peds.append(ped)
+	# 乱穿者
+	_fx_jay = Node2D.new()
+	_fx_jay.name = "Jaywalker"
+	_fx_jay.position = Vector2(220, 250)
+	ChibiFactoryScr.make_pedestrian(_fx_jay, Color("EF4444"))
+	world.add_child(_fx_jay)
 
 	# Player
 	player = CharacterBody2D.new()
 	player.name = "Player"
-	player.position = Vector2(640, 200)
-	var body := ColorRect.new()
-	body.name = "Body"
-	body.size = Vector2(28, 36)
-	body.position = Vector2(-14, -20)
-	body.color = Color("E0F2FE")
-	player.add_child(body)
-	var vest := ColorRect.new()
-	vest.name = "Vest"
-	vest.size = Vector2(32, 22)
-	vest.position = Vector2(-16, -8)
-	vest.color = ORANGE
-	player.add_child(vest)
-	var head := ColorRect.new()
-	head.name = "Head"
-	head.size = Vector2(26, 26)
-	head.position = Vector2(-13, -44)
-	head.color = Color("FDE68A")
-	player.add_child(head)
+	player.position = Vector2(640, 240)
+	ChibiFactoryScr.make_player(player)
 	player.set_script(load("res://scripts/world/player.gd"))
 	world.add_child(player)
 
 	focus_ring = Node2D.new()
 	focus_ring.name = "FocusRing"
-	var ell := Polygon2D.new()
-	ell.name = "Ellipse"
-	ell.polygon = PackedVector2Array([Vector2(-28, -10), Vector2(28, -10), Vector2(28, 10), Vector2(-28, 10)])
-	ell.color = Color(AMBER.r, AMBER.g, AMBER.b, 0.45)
-	focus_ring.add_child(ell)
-	var arrow := Polygon2D.new()
-	arrow.name = "Arrow"
-	arrow.polygon = PackedVector2Array([Vector2(32, -6), Vector2(48, 0), Vector2(32, 6)])
-	arrow.color = Color(AMBER.r, AMBER.g, AMBER.b, 0.9)
-	focus_ring.add_child(arrow)
 	focus_ring.set_script(load("res://scripts/world/focus_ring.gd"))
 	player.add_child(focus_ring)
 
-	# NPC Alian
+	# NPC 阿莲（略高）
 	alian = Node2D.new()
 	alian.name = "NPC_Alian"
-	alian.position = Vector2(700, 180)
-	var ab := ColorRect.new()
-	ab.size = Vector2(30, 48)
-	ab.position = Vector2(-15, -40)
-	ab.color = ORANGE
-	alian.add_child(ab)
+	alian.position = Vector2(720, 230)
+	ChibiFactoryScr.make_alian(alian)
 	var aname := Label.new()
 	aname.text = "阿莲"
-	aname.position = Vector2(-16, 12)
+	aname.position = Vector2(-16, 18)
 	aname.add_theme_font_size_override("font_size", 14)
+	if UiTheme.ui_font:
+		aname.add_theme_font_override("font", UiTheme.ui_font)
+		aname.add_theme_color_override("font_color", Color(1, 0.95, 0.85))
 	alian.add_child(aname)
 	world.add_child(alian)
 
-func _zone(parent: Node2D, rect: Rect2, color: Color, title: String) -> void:
+	# 领队（HUB 外缘轻量）
+	leader = Node2D.new()
+	leader.name = "NPC_Leader"
+	leader.position = Vector2(540, 200)
+	ChibiFactoryScr.make_leader(leader)
+	var lname := Label.new()
+	lname.text = "领队"
+	lname.position = Vector2(-16, 18)
+	lname.add_theme_font_size_override("font_size", 14)
+	if UiTheme.ui_font:
+		lname.add_theme_font_override("font", UiTheme.ui_font)
+	leader.add_child(lname)
+	world.add_child(leader)
+
+func _road(parent: Node2D, rect: Rect2, color: Color) -> void:
+	var tex: Texture2D = null
+	if ResourceLoader.exists("res://assets/sprites/tiles/asphalt_tile.png"):
+		tex = load("res://assets/sprites/tiles/asphalt_tile.png")
+	if tex:
+		var tw := 64
+		var th := 64
+		var x0 := int(rect.position.x)
+		var y0 := int(rect.position.y)
+		var x1 := int(rect.position.x + rect.size.x)
+		var y1 := int(rect.position.y + rect.size.y)
+		var y := y0
+		while y < y1:
+			var x := x0
+			while x < x1:
+				var sp := Sprite2D.new()
+				sp.texture = tex
+				sp.centered = false
+				sp.position = Vector2(x, y)
+				sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				sp.z_index = -15
+				parent.add_child(sp)
+				x += tw
+			y += th
+		# curb strip on top edge if horizontal-ish
+		if rect.size.x > rect.size.y and ResourceLoader.exists("res://assets/sprites/tiles/curb_tile.png"):
+			var ctex: Texture2D = load("res://assets/sprites/tiles/curb_tile.png")
+			var cx := x0
+			while cx < x1:
+				var cs := Sprite2D.new()
+				cs.texture = ctex
+				cs.centered = false
+				cs.position = Vector2(cx, y0 - 8)
+				cs.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				cs.z_index = -14
+				parent.add_child(cs)
+				cx += 64
+	else:
+		var r := ColorRect.new()
+		r.position = rect.position
+		r.size = rect.size
+		r.color = color
+		r.z_index = -15
+		parent.add_child(r)
+
+func _zone_pad(parent: Node2D, rect: Rect2, fill: Color, title: String, accent: Color) -> void:
 	var r := ColorRect.new()
 	r.position = rect.position
 	r.size = rect.size
-	r.color = color
+	r.color = fill
+	r.z_index = -12
 	parent.add_child(r)
-	var border := ColorRect.new()
-	border.position = rect.position
-	border.size = Vector2(rect.size.x, 4)
-	border.color = CURB
-	parent.add_child(border)
+	var top := ColorRect.new()
+	top.position = rect.position
+	top.size = Vector2(rect.size.x, 6)
+	top.color = accent
+	top.z_index = -11
+	parent.add_child(top)
 	var lab := Label.new()
 	lab.text = title
-	lab.position = rect.position + Vector2(12, 8)
-	lab.add_theme_font_size_override("font_size", 20)
+	lab.position = rect.position + Vector2(10, 10)
+	lab.add_theme_font_size_override("font_size", 18)
 	if UiTheme.ui_font:
 		lab.add_theme_font_override("font", UiTheme.ui_font)
-	lab.add_theme_color_override("font_color", Color(1, 0.95, 0.85))
+	lab.add_theme_color_override("font_color", Color(1, 0.96, 0.88))
+	lab.z_index = -10
 	parent.add_child(lab)
+
+func _zebra(parent: Node2D, origin: Vector2, width: float, height: float, stripes: int) -> void:
+	if ResourceLoader.exists("res://assets/sprites/tiles/zebra_tile.png"):
+		var tex: Texture2D = load("res://assets/sprites/tiles/zebra_tile.png")
+		var n := maxi(1, int(width / 64.0))
+		for i in range(n):
+			var sp := Sprite2D.new()
+			sp.texture = tex
+			sp.centered = false
+			sp.position = origin + Vector2(i * 64, 0)
+			sp.scale = Vector2(1.0, maxf(1.0, height / 64.0))
+			sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			parent.add_child(sp)
+		return
+	var bed := ColorRect.new()
+	bed.position = origin
+	bed.size = Vector2(width, height)
+	bed.color = Color("374151")
+	parent.add_child(bed)
+	var sw := width / float(stripes * 2)
+	for i in range(stripes):
+		var s := ColorRect.new()
+		s.position = origin + Vector2(i * sw * 2, 4)
+		s.size = Vector2(sw, height - 8)
+		s.color = Color(1, 1, 1, 0.92)
+		parent.add_child(s)
+
+func _traffic_light(parent: Node2D, origin: Vector2, name: String, big: bool = false) -> void:
+	var path := "res://assets/sprites/props/signal_red.png"
+	if ResourceLoader.exists(path):
+		var sp := Sprite2D.new()
+		sp.name = name
+		sp.texture = load(path)
+		sp.centered = false
+		sp.position = origin
+		sp.scale = Vector2(1.35, 1.35) if big else Vector2(1.0, 1.0)
+		sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		parent.add_child(sp)
+		_fx_light_r = sp
+		# store state textures on meta for intro flash
+		sp.set_meta("tex_red", load("res://assets/sprites/props/signal_red.png"))
+		if ResourceLoader.exists("res://assets/sprites/props/signal_amber.png"):
+			sp.set_meta("tex_amber", load("res://assets/sprites/props/signal_amber.png"))
+		if ResourceLoader.exists("res://assets/sprites/props/signal_green.png"):
+			sp.set_meta("tex_green", load("res://assets/sprites/props/signal_green.png"))
+		return
+	var pole_h := 130 if big else 90
+	var pole := ColorRect.new()
+	pole.name = name + "_pole"
+	pole.color = Color("111827")
+	pole.position = origin
+	pole.size = Vector2(18 if big else 14, pole_h)
+	parent.add_child(pole)
+	var box := ColorRect.new()
+	box.color = Color("0F172A")
+	box.position = origin + Vector2(-8, 0)
+	box.size = Vector2(34 if big else 28, 90 if big else 70)
+	parent.add_child(box)
+	var colors := [Color("EF4444"), Color("F59E0B"), Color("22C55E")]
+	for i in range(3):
+		var lamp := ColorRect.new()
+		lamp.name = "%s_lamp_%d" % [name, i]
+		lamp.size = Vector2(20 if big else 16, 20 if big else 16)
+		lamp.position = origin + Vector2(-1, 8 + i * (28 if big else 22))
+		lamp.color = colors[i]
+		parent.add_child(lamp)
+		if name == "s2_light" and i == 0:
+			_fx_light_r = lamp
+
+func _intro_world_fx(frame_idx: int) -> void:
+	# 对齐 02b 开场可见冲突：人流／乱穿／时长闪红
+	match frame_idx:
+		0, 1, 2:
+			# 人流微颤
+			if _fx_crowd:
+				for i in range(_peds.size()):
+					var ped: Node2D = _peds[i]
+					var tw := create_tween()
+					tw.tween_property(ped, "position:x", ped.position.x + 6, 0.25)
+					tw.tween_property(ped, "position:x", ped.position.x, 0.25)
+		3, 4:
+			# 乱穿抬脚
+			if _fx_jay:
+				var tw := create_tween()
+				tw.tween_property(_fx_jay, "position", Vector2(260, 210), 0.35)
+				tw.tween_property(_fx_jay, "modulate", Color(1.2, 0.6, 0.6), 0.2)
+		5, 6:
+			# 时长屏闪红 + 红灯强调
+			if _fx_timing:
+				var tw := create_tween().set_loops(3)
+				tw.tween_property(_fx_timing, "color", Color("DC2626"), 0.18)
+				tw.tween_property(_fx_timing, "color", Color("7F1D1D"), 0.18)
+			if _fx_light_r:
+				var tw2 := create_tween().set_loops(3)
+				tw2.tween_property(_fx_light_r, "modulate", Color(1.4, 0.4, 0.4), 0.15)
+				tw2.tween_property(_fx_light_r, "modulate", Color.WHITE, 0.15)
+		_:
+			if _fx_timing:
+				_fx_timing.color = Color("0F766E")
 
 func _build_ui() -> void:
 	var ui := CanvasLayer.new()
@@ -447,10 +704,14 @@ func _play_intro(is_replay: bool) -> void:
 				"correct": true,
 				"payload": {"capture": "in_world_action", "waitingStepId": "wait_green"},
 			})
+			_intro_world_fx(idx[0] - 1)
 			_show_hub()
 		else:
 			body.text = _intro_frames[idx[0]]
+			_intro_world_fx(idx[0])
 	)
+	# 首帧也给一点人流反馈
+	_intro_world_fx(0)
 	if not closable:
 		# first play still allow skip per design
 		pass
@@ -746,7 +1007,19 @@ func _smoke_playthrough() -> void:
 	get_tree().quit(0 if ok else 1)
 
 
+func _shot_hub() -> void:
+	await get_tree().create_timer(0.25).timeout
+	if story_replay:
+		story_replay.visible = false
+	GameState.intro_seen = true
+	_show_hub()
+	# 可见冲突：时长闪红 + 乱穿位
+	_intro_world_fx(6)
+	if _fx_jay:
+		_fx_jay.position = Vector2(250, 205)
+
 func _shot_s1() -> void:
+
 	await get_tree().create_timer(0.3).timeout
 	if story_replay:
 		story_replay.visible = false

@@ -15,3 +15,6 @@
 - **Noto Sans CJK SC**（`assets/fonts/NotoSansSC-Regular.ttf`，自 NotoSansCJK-Regular.ttc 提取 SC 字面）— SIL Open Font License 1.1  
   来源：Google Noto CJK / `/usr/share/fonts/opentype/noto/`  
 - 另附课文用字子集 `NotoSansSC-Lesson.ttf`（同许可）作瘦身备选。
+
+## Art
+- g5l7-godot-art-pack-v1（方案 A 橙马甲占位升级包，本课定制）

@@ -1,21 +1,18 @@
 extends CharacterBody2D
-## Q版橙马甲占位玩家
+## 玩家四向精灵切换（art-pack idle_*）
 
 const SPEED := 180.0
 
-@onready var body_rect: ColorRect = $Body
-@onready var vest_rect: ColorRect = $Vest
-@onready var head_rect: ColorRect = $Head
-
 var can_move: bool = true
+var _facing: String = "down"
+var _tex: Dictionary = {}
 
 func _ready() -> void:
-	if body_rect:
-		body_rect.color = Color("E0F2FE")
-	if vest_rect:
-		vest_rect.color = Color("F97316")
-	if head_rect:
-		head_rect.color = Color("FDE68A")
+	for d in ["down", "left", "right", "up"]:
+		var path := "res://assets/sprites/player/idle_%s.png" % d
+		if ResourceLoader.exists(path):
+			_tex[d] = load(path)
+	_apply_facing("down")
 
 func _physics_process(_delta: float) -> void:
 	if not can_move:
@@ -24,7 +21,18 @@ func _physics_process(_delta: float) -> void:
 		return
 	var dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	velocity = dir * SPEED
+	if dir.length() > 0.1:
+		if abs(dir.x) > abs(dir.y):
+			_apply_facing("right" if dir.x > 0.0 else "left")
+		else:
+			_apply_facing("down" if dir.y > 0.0 else "up")
 	move_and_slide()
+
+func _apply_facing(face: String) -> void:
+	_facing = face
+	var sp := get_node_or_null("Sprite") as Sprite2D
+	if sp and _tex.has(face):
+		sp.texture = _tex[face]
 
 func teleport_to(pos: Vector2) -> void:
 	global_position = pos
