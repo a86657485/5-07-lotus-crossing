@@ -351,6 +351,8 @@ function createService(options = {}) {
     '.woff2': 'font/woff2',
     '.json': 'application/json; charset=utf-8',
     '.map': 'application/json; charset=utf-8',
+    '.wasm': 'application/wasm',
+    '.pck': 'application/octet-stream',
   };
 
   function sendFile(res, file, reqMethod) {

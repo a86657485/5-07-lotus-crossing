@@ -52,3 +52,7 @@ DATA_DIR="$PWD/.data-test" PORT=8797 npm start
 - Phase B Godot：仅 `godot/README.md` 脚手架，未导出 HTML5
 - L5 浏览器手点第1站完整通关未做
 - 老师同意前不合并 main 作为正式上课入口
+
+## Phase B
+
+见 [`INTEGRATE_PHASE_B.md`](./INTEGRATE_PHASE_B.md)（Godot 4.7 HTML5 导出与 JS 桥，2026-11-01）。

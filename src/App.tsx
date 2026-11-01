@@ -8,6 +8,7 @@ import { Station3TimingDispatchView } from './components/views/Station3TimingDis
 import { ExamView } from './components/views/ExamView';
 import { RewardLoopGame } from './components/views/RewardLoopGame';
 import { TeacherDashboardView } from './components/views/TeacherDashboardView';
+import { GodotLabView } from './components/views/GodotLabView';
 import {
   ExamEvaluationResult,
   RelicState,
@@ -17,6 +18,27 @@ import {
   TaskId,
 } from './types';
 import { apiLogin, apiSaveProgress, apiUseRelic, ServerState } from './api/client';
+
+
+declare global {
+  interface Window {
+    G5L7Classroom?: {
+      setContext: (student: Student, progress?: ServerState | null) => void;
+      getStudent: () => Student | null;
+      getProgress: () => unknown;
+      reportStation: (taskId: string, payload?: object) => Promise<unknown>;
+      useRelic: () => Promise<unknown>;
+    };
+  }
+}
+
+function syncBridgeContext(student: Student | null, state: ServerState | null) {
+  try {
+    window.G5L7Classroom?.setContext?.(student as Student, state);
+  } catch {
+    /* bridge optional */
+  }
+}
 
 function emptyStations(): StationProgress {
   return {
@@ -70,7 +92,7 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState<ServerState | null>(null);
   const [syncError, setSyncError] = useState('');
   const [currentView, setCurrentView] = useState<
-    'login' | 'intro' | 'map' | 'station1' | 'station2' | 'station3' | 'exam' | 'reward_game'
+    'login' | 'intro' | 'map' | 'station1' | 'station2' | 'station3' | 'exam' | 'reward_game' | 'godot_lab'
   >('login');
   const [hasPlayedIntroOnce, setHasPlayedIntroOnce] = useState(false);
 
@@ -80,6 +102,7 @@ export default function App() {
       try {
         const res = await apiSaveProgress(currentStudent.studentId, patch);
         setCurrentSession(res.state);
+        syncBridgeContext(currentStudent, res.state);
         setSyncError('');
       } catch (err: any) {
         setSyncError(err?.message || '进度同步失败');
@@ -102,6 +125,7 @@ export default function App() {
       });
       setCurrentStudent(res.student);
       setCurrentSession(res.state);
+      syncBridgeContext(res.student, res.state);
       setCurrentView('intro');
     } catch (err: any) {
       setSyncError(err?.message || '登录失败，请确认课堂服务已启动');
@@ -251,6 +275,7 @@ export default function App() {
           onReplayIntro={() => setCurrentView('intro')}
           onResetStation={handleResetStation}
           onOpenRewardGame={() => setCurrentView('reward_game')}
+          onOpenGodotLab={() => setCurrentView('godot_lab')}
           rewardUnlocked={currentSession?.rewardUnlocked}
         />
       )}
@@ -287,6 +312,13 @@ export default function App() {
 
       {currentView === 'reward_game' && (
         <RewardLoopGame onBackToMap={() => setCurrentView('map')} />
+      )}
+
+      {currentView === 'godot_lab' && currentStudent && (
+        <GodotLabView
+          studentId={currentStudent.studentId}
+          onBackToMap={() => setCurrentView('map')}
+        />
       )}
     </div>
   );

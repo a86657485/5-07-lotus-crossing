@@ -9,3 +9,8 @@ runtime/
 .aistudio/
 *.sqlite
 *.sqlite-*
+
+# Godot
+godot/project/.godot/
+godot/project/.import/
+*.translation

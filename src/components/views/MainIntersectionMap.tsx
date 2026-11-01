@@ -13,6 +13,7 @@ interface MainIntersectionMapProps {
   onReplayIntro: () => void;
   onResetStation: (taskId: TaskId) => void;
   onOpenRewardGame?: () => void;
+  onOpenGodotLab?: () => void;
   rewardUnlocked?: boolean;
 }
 
@@ -26,6 +27,7 @@ export const MainIntersectionMap: React.FC<MainIntersectionMapProps> = ({
   onReplayIntro,
   onResetStation,
   onOpenRewardGame,
+  onOpenGodotLab,
   rewardUnlocked = false,
 }) => {
   // Determine current active station
@@ -75,6 +77,17 @@ export const MainIntersectionMap: React.FC<MainIntersectionMapProps> = ({
 
         {/* Action Controls & Relic Badge */}
         <div className="flex items-center gap-2.5">
+          {onOpenGodotLab && (
+            <button
+              type="button"
+              onClick={onOpenGodotLab}
+              className="text-xs text-cyan-200 hover:text-white px-3 py-1.5 rounded-xl border border-cyan-700/60 bg-cyan-950/40 hover:bg-cyan-900/50 transition"
+              title="Phase B 可选：Godot HTML5 试验台"
+            >
+              Godot 试验台
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onReplayIntro}

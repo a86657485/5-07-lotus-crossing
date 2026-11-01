@@ -1,0 +1,23 @@
+; Engine configuration file.
+; Godot 4.7 · 莲花山智慧路口 · Phase B 最小课堂嵌入工程
+config_version=5
+
+[application]
+
+config/name="莲花山智慧路口·Godot试验台"
+config/description="五年级第7课 Phase B：三站入口 + JS 桥上报（不重写 Studio 主探究）"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=640
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
