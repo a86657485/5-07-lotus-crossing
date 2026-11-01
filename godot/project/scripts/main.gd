@@ -27,12 +27,16 @@ var s2c: Control
 var s3: Control
 
 var _intro_frames: Array = [
+	"旁白：莲花山南门这边，开放日人特别多。",
 	"阿莲：开放日人多，需要助手。",
 	"阿莲：先穿上这件橙马甲。",
-	"行人：等到绿灯就行。——哪一步在一直等？",
-	"困难：等到什么时候停？说不清。时长屏参数错乱。",
-	"探究：哪一步在反复？做到什么时候停？灯时长为啥要改？",
-	"任务单：S1→S2→S3。前往行人过街引导台。",
+	"领队：别让孩子们在路口空等太久。",
+	"行人：等到绿灯就行。",
+	"阿莲：等到什么时候停？说不清。",
+	"系统：时长屏参数错乱。",
+	"探究：哪一步在反复？做到什么时候停？",
+	"探究：灯时长为啥要改？",
+	"阿莲：先去引导台，把队伍排稳。",
 ]
 
 func _ready() -> void:
@@ -79,9 +83,9 @@ func _build_world() -> void:
 	world.add_child(bg)
 
 	# zones: S1 left, HUB center, S3 right, S2 bottom
-	_zone(world, Rect2(40, 80, 360, 280), Color("64748B"), "S1 引导台")
-	_zone(world, Rect2(460, 60, 360, 260), Color("475569"), "HUB 枢纽")
-	_zone(world, Rect2(880, 80, 360, 280), Color("334155"), "S3 调度台")
+	_zone(world, Rect2(40, 80, 360, 280), Color("64748B"), "S1 斑马线引导台")
+	_zone(world, Rect2(460, 60, 360, 260), Color("475569"), "HUB·莲花山南门")
+	_zone(world, Rect2(880, 80, 360, 280), Color("334155"), "S3 信号调度亭")
 	_zone(world, Rect2(200, 380, 880, 260), Color("1E293B"), "S2 信号循环拆解台")
 
 	# zebra placeholder
@@ -199,7 +203,7 @@ func _build_ui() -> void:
 	task_bar.size = Vector2(880, 40)
 	var tb_l := Label.new()
 	tb_l.name = "Label"
-	tb_l.text = "开放日路口：听阿莲安排，一站站帮上忙。"
+	tb_l.text = "莲花山南门智慧路口：开放日临时小交警助手。"
 	task_bar.add_child(tb_l)
 	ui.add_child(task_bar)
 
@@ -458,7 +462,7 @@ func _on_replay_req(payload: Dictionary) -> void:
 func _show_hub() -> void:
 	GameState.active_station = "hub"
 	player.can_move = true
-	_set_task("任务单：完成 S1→S2→S3 后开考。点下方一键前往。")
+	_set_task("阿莲：先去引导台，把队伍排稳。点下方一键前往。")
 	GameState.set_focus("teleport_s1")
 	_refresh_teleports()
 	_hide_stations()
@@ -480,12 +484,12 @@ func _teleport(station: String, pos: Vector2) -> void:
 			_open_s1()
 		"s2":
 			if not GameState.s2_unlocked():
-				_toast("请先完成引导台（S1）。")
+				_toast("阿莲：先把引导台队伍排稳。")
 				return
 			_open_s2_flow()
 		"s3":
 			if not GameState.s3_unlocked():
-				_toast("请先完成拆解台三关（S2）。")
+				_toast("阿莲：调度亭那边还在堵——先拆清『再等』。")
 				return
 			_open_s3()
 		"hub":
@@ -494,7 +498,7 @@ func _teleport(station: String, pos: Vector2) -> void:
 func _open_s1() -> void:
 	_hide_stations()
 	GameState.active_station = "s1"
-	_set_task("S1：把过街步骤排对，并标出一直等的那步。")
+	_set_task("①队伍乱了有人要乱穿 ②帮阿莲排地贴 ③排对能按序走并标出一直等")
 	# optional learn card short
 	s1.visible = true
 	if s1.has_method("open_station"):
@@ -508,7 +512,7 @@ func _open_s2_flow() -> void:
 	var modal := learn_card
 	modal.visible = true
 	modal.get_node("VBox/Title").text = "先学卡·信号循环"
-	modal.get_node("VBox/Body").text = "①菱形问「还要不要再做」\n②回边＝条件成立再走一遍\n③次数可以事先不知道\n（不用「循环体」这个词）"
+	modal.get_node("VBox/Body").text = "阿莲：屏上那截『一直等』，得改成带回箭头的。\n①菱形问「还要不要再做」\n②回边＝条件成立再走一遍\n③次数可以事先不知道\n（不用「循环体」这个词）"
 	var close_b: Button = modal.get_node("VBox/HBox/CloseBtn")
 	var next_b: Button = modal.get_node("VBox/HBox/NextBtn")
 	next_b.text = "开始拆解"
@@ -525,7 +529,7 @@ func _open_s2_flow() -> void:
 func _open_s2a() -> void:
 	_hide_stations()
 	GameState.active_station = "s2a"
-	_set_task("S2-A：把观察并等待改成带回箭头的图。")
+	_set_task("①说不清『再等』停哪 ②帮阿莲拆灯态 ③回边接对灯会再闪")
 	s2a.visible = true
 	if s2a.has_method("open_station"):
 		s2a.open_station()
@@ -534,7 +538,7 @@ func _open_s2a() -> void:
 func _open_s2b() -> void:
 	_hide_stations()
 	GameState.active_station = "s2b"
-	_set_task("S2-B：哪张屏在问还要不要再做？")
+	_set_task("两张屏都有菱形。哪张在问还要不要再做？")
 	s2b.visible = true
 	if s2b.has_method("open_station"):
 		s2b.open_station()
@@ -543,7 +547,7 @@ func _open_s2b() -> void:
 func _open_s2c() -> void:
 	_hide_stations()
 	GameState.active_station = "s2c"
-	_set_task("S2-C：保温壶贴标签——问什么、反复做什么、先问或先做。")
+	_set_task("阿莲：休息点的壶也在反复加热，先标清楚。")
 	s2c.visible = true
 	if s2c.has_method("open_station"):
 		s2c.open_station()
@@ -552,7 +556,7 @@ func _open_s2c() -> void:
 func _open_s3() -> void:
 	_hide_stations()
 	GameState.active_station = "s3"
-	_set_task("S3：先运行见故障，再改时长与理由，再运行核对。")
+	_set_task("①路口堵了时长错了 ②帮阿莲调时长 ③换规则再运行看是否缓解")
 	s3.visible = true
 	if s3.has_method("open_station"):
 		s3.open_station()
@@ -591,12 +595,13 @@ func _on_s1_done(data: Dictionary) -> void:
 	GameState.unlocked_relics["whistle"] = true
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S1, data))
 	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S2A, "unlocked": true})
-	_toast("阿莲：顺序有了。下一步把『一直等』说清楚。")
+	_toast("阿莲：顺序有了。下一步把『一直等』说清楚。\n阿莲：这块哨给你，引导台先稳住了。")
 	_open_s2_flow()
 
 func _on_s2a_done(data: Dictionary) -> void:
 	GameState.set_station_done(GameState.TASK_S2A, true)
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2A, data))
+	_toast("阿莲：接对了，灯会再闪一轮。")
 	_open_s2b()
 
 func _on_s2b_done(data: Dictionary) -> void:
@@ -609,7 +614,7 @@ func _on_s2c_done(data: Dictionary) -> void:
 	GameState.set_station_done(GameState.TASK_S2C, true)
 	GameState.unlocked_relics["arrow"] = true
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2C, data))
-	_toast("阿莲：反复说清了，也分清了『再等』和『选路』。")
+	_toast("阿莲：反复说清了，也分清了『再等』和『选路』。\n阿莲：这枚箭头给你——再等，也能画清楚了。\n阿莲：调度亭那边还在堵。")
 	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S3, "unlocked": true})
 	_show_hub()
 	GameState.set_focus("teleport_s3")
@@ -621,12 +626,12 @@ func _on_s3_done(data: Dictionary) -> void:
 		GameState.s3_detail = data["s3Detail"]
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S3, data))
 	ClassroomBridge.emit_to_js("progress:s3Detail", GameState.s3_detail)
-	_toast("阿莲：时长设对了，路口顺多了。三站完成，开始当课小测。")
+	_toast("阿莲：时长设对了，路口顺多了。\n阿莲：三站稳住了。来当课小测。\n领队：顺多了，谢谢小助手。")
 	_on_exam_opened()
 
 func _on_exam_opened() -> void:
 	ClassroomBridge.open_exam()
-	_set_task("三站完成，开始当课小测。（考核在网页侧）")
+	_set_task("系统：三站完成，开始当课小测。（考核在网页侧）")
 
 func _on_relic() -> void:
 	if GameState.relic_remaining <= 0:

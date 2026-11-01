@@ -39,7 +39,7 @@ func open_station() -> void:
 	repeat_step_id = ""
 	timing_choice = ""
 	_history.clear()
-	prompt.text = "贴标签：问什么、反复做什么、先问还是先做。"
+	prompt.text = "阿莲：休息点的壶也在反复加热，先标清楚。\n贴标签：问什么、反复做什么、先问还是先做。"
 	pot_l.text = "保温壶待命（禁用「循环体」说法）"
 
 func _fill() -> void:

@@ -54,6 +54,9 @@ func open_station() -> void:
 	_ped_state = "idle"
 	_rebuild_pool()
 	_refresh()
+	# 进站三问故事口吻（02b）
+	if prompt:
+		prompt.text = "①开放日队伍乱了，有人要乱穿。\n②帮阿莲把地贴步骤排对。\n③排对了会按序走；再标出一直等的那步。"
 
 func _build_ui() -> void:
 	for c in slots_row.get_children():
@@ -151,9 +154,9 @@ func _update_ped() -> void:
 
 func _refresh() -> void:
 	if _phase == 1:
-		prompt.text = "把过街步骤拖到斑马线地贴上（点选填入）"
+		prompt.text = "阿莲：地贴被人踩乱了。你来排，我盯着行人。\n把过街步骤点选填入斑马线地贴。"
 	else:
-		prompt.text = "点出会一直等的那一步"
+		prompt.text = "阿莲：还要标出一直等的那步。\n点出会一直等的那一步。"
 	for i in range(slots_row.get_child_count()):
 		var b: Button = slots_row.get_child(i)
 		var id := _slots[i] if i < _slots.size() else ""
@@ -163,7 +166,7 @@ func _refresh() -> void:
 			ped_label.text = "行人按序走过斑马线 ✓"
 			ped_label.modulate = Color(0.4, 0.9, 0.5)
 		"chaos":
-			ped_label.text = "行人卡住／有人乱穿！⌫ 可撤回"
+			ped_label.text = "阿莲：看，有人挤出斑马线了！⌫ 可撤回"
 			ped_label.modulate = Color(1.0, 0.4, 0.4)
 		_:
 			ped_label.text = "行人在路口等待布置…"
@@ -189,7 +192,7 @@ func _submit() -> void:
 	if _waiting_picked != WAIT_ID:
 		var n2 := GameState.bump_fail(GameState.TASK_S1)
 		ClassroomBridge.request_scaffold(GameState.TASK_S1, mini(n2, 3), "M2")
-		ped_label.text = "还没标出一直等的那步。"
+		ped_label.text = "阿莲：还没标出一直等的那步。"
 		return
 	var payload := {
 		"evidenceCode": "S1",

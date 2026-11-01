@@ -26,7 +26,7 @@ func open_station() -> void:
 	visible = true
 	selected_side = ""
 	highlighted_back = false
-	prompt.text = "两张屏都有菱形。哪张在问还要不要再做？"
+	prompt.text = "①信号屏说不清『再等』停在哪。\n两张屏都有菱形。哪张在问还要不要再做？"
 	anim_l.text = "点选后看灯柱／行人动画。"
 	# 未作答零高亮：不改按钮主题色暗示答案
 

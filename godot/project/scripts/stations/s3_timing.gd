@@ -35,7 +35,7 @@ func open_station() -> void:
 	reason_id = ""
 	rule_changed = false
 	revalidate_ok = false
-	prompt.text = "先运行看故障，再布置时长，再运行核对。"
+	prompt.text = "阿莲：调度亭这边交给你。先运行，看哪边堵。\n领队：开放日车流还在涨，快点稳住。"
 	traffic_l.text = "车流条：尚未运行"
 	_update_gate()
 
@@ -54,7 +54,7 @@ func _btn(parent: HBoxContainer, text: String, id: String, kind: String) -> void
 
 func _pick(kind: String, id: String) -> void:
 	if not fault_observed:
-		gate_l.text = "还没实测故障：请先点「运行路口」。"
+		gate_l.text = "阿莲：先运行，看哪边堵。"
 		ClassroomBridge.gate_state(GameState.TASK_S3, "pre_missing")
 		return
 	match kind:
@@ -94,9 +94,9 @@ func _update_gate() -> void:
 		g = "verified_ready"
 	match g:
 		"pre_missing":
-			gate_l.text = "缺实测：先运行路口看故障。"
+			gate_l.text = "阿莲：先运行，看哪边堵。"
 		"pre_done_unverified":
-			gate_l.text = "已见故障：请选时长策略与理由，再运行核对。（勿重复只跑故障）"
+			gate_l.text = "阿莲：别再空跑故障，先换时长。"
 		"verified_ready":
 			gate_l.text = "重验通过，可以锁定通关。"
 	ClassroomBridge.gate_state(GameState.TASK_S3, g)

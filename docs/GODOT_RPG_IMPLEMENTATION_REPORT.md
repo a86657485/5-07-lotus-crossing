@@ -33,3 +33,8 @@ PORT=8797 DATA_DIR=.data-test npm start
 | L4 | 浏览器登录→Godot 画布加载+中文截图；站内点击未在浏览器逐关手点（逻辑已 headless 通关） |
 | L5 | 未测真课堂 |
 | L6 | 未测 |
+
+## 2026-11-01 剧情加厚（02b）
+- 已按 `design/02b_剧情加厚_人物事件地点.md` 替换开场／进站三问／站间钩子／出口人物句；机制与 taskId 零改。
+- 截图：`docs/screenshots/05_story_intro_02b.png`、`06_story_s1_enter_02b.png`
+- headless smoke：全站 ok；已重导出 `public/godot/`。

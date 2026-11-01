@@ -86,7 +86,7 @@ func _undo() -> void:
 	_refresh_labels()
 
 func _refresh_labels() -> void:
-	prompt.text = "把『观察并等待』改成带回箭头的图。"
+	prompt.text = "阿莲：屏上那截『一直等』，得改成带回箭头的。\n把『观察并等待』改成带回箭头的图。"
 	# selection shown in light line pre-lock
 	if not locked:
 		light_l.text = "条件=%s｜反复=%s｜回边=%s（锁定前不对错）" % [cond_id, repeat_id, back_id]
