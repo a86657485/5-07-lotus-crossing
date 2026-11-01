@@ -56,3 +56,9 @@ PORT=8797 DATA_DIR=.data-test npm start
 - 必嵌：玩家四向、alian_front、street_hub_bg 1280×720、signal_prop、focus_ring；根目录色块仅 fallback
 - 截图更新：`docs/screenshots/07_visual_hub.png`、`08_s1_play.png`
 - `public/godot/` 已重导出；8797 `server.cjs` 已确认
+
+## 2026-11-01 正路径减噪／焦点
+- 枢纽：满屏区划垫改为四角轻量 chip；AI 街景下不再叠拆解台色块／壶亭；灯柱留一柱
+- 任务条：枢纽只显示「唯一下一步」人物句；传送钮琥珀高亮下一步、未解锁禁用
+- 开场：首看隐藏关闭／不可跳过；二刷可关
+- 截图已更新 07／08；smoke ok；8797 确认

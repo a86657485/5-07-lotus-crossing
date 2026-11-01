@@ -103,11 +103,11 @@ func _build_world() -> void:
 		bg_sp.z_index = -20
 		bg_sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		world.add_child(bg_sp)
-		# 半透明分区标签，不盖死街景
-		_zone_pad(world, Rect2(24, 150, 420, 200), Color(0.1, 0.15, 0.22, 0.22), "S1 斑马线引导台", Color("38BDF8"))
-		_zone_pad(world, Rect2(470, 150, 340, 180), Color(0.1, 0.12, 0.16, 0.2), "HUB·莲花山南门", AMBER)
-		_zone_pad(world, Rect2(840, 150, 416, 200), Color(0.08, 0.14, 0.12, 0.22), "S3 信号调度亭", Color("34D399"))
-		_zone_pad(world, Rect2(160, 390, 960, 280), Color(0.08, 0.1, 0.14, 0.25), "S2 信号循环拆解台", ORANGE)
+		# 轻量角标（非满屏色块说明条）
+		_zone_chip(world, Vector2(36, 156), "S1 引导台", Color("38BDF8"))
+		_zone_chip(world, Vector2(520, 156), "HUB", AMBER)
+		_zone_chip(world, Vector2(980, 156), "S3 调度亭", Color("34D399"))
+		_zone_chip(world, Vector2(200, 400), "S2 拆解台", ORANGE)
 	else:
 		# 天空 + 色块街景 fallback
 		var bg := ColorRect.new()
@@ -132,93 +132,75 @@ func _build_world() -> void:
 		_zone_pad(world, Rect2(160, 390, 960, 280), Color(0.18, 0.24, 0.32, 0.55), "S2 信号循环拆解台", ORANGE)
 		_zebra(world, Vector2(60, 230), 360, 48, 8)
 
-	# S1 / S2 灯柱（优先 AI signal_prop）
-	_traffic_light(world, Vector2(70, 175), "s1_light")
-	_traffic_light(world, Vector2(560, 400), "s2_light", true)
-
-	# S2 流程图亭底板
-	var kiosk := ColorRect.new()
-	kiosk.color = Color("1E293B")
-	kiosk.position = Vector2(640, 450)
-	kiosk.size = Vector2(180, 120)
-	world.add_child(kiosk)
-	var kiosk_title := Label.new()
-	kiosk_title.text = "拆解台"
-	kiosk_title.position = Vector2(690, 456)
-	kiosk_title.add_theme_font_size_override("font_size", 16)
-	if UiTheme.ui_font:
-		kiosk_title.add_theme_font_override("font", UiTheme.ui_font)
-	world.add_child(kiosk_title)
-	# 回边琥珀箭头示意
-	var loop_a := Polygon2D.new()
-	loop_a.color = Color(AMBER.r, AMBER.g, AMBER.b, 0.85)
-	loop_a.polygon = PackedVector2Array([
-		Vector2(660, 520), Vector2(780, 520), Vector2(780, 500), Vector2(800, 530),
-		Vector2(780, 560), Vector2(780, 540), Vector2(660, 540)
-	])
-	world.add_child(loop_a)
-
-	# HUB 保温壶桌
-	var table := ColorRect.new()
-	table.color = Color("78716C")
-	table.position = Vector2(600, 250)
-	table.size = Vector2(70, 18)
-	world.add_child(table)
-	if ResourceLoader.exists("res://assets/sprites/props/thermos.png"):
-		var pot_sp := Sprite2D.new()
-		pot_sp.name = "Thermos"
-		pot_sp.texture = load("res://assets/sprites/props/thermos.png")
-		pot_sp.centered = false
-		pot_sp.position = Vector2(610, 190)
-		pot_sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		world.add_child(pot_sp)
+	# 灯柱：有街景时只留 S2 一柱，减噪；fallback 双柱
+	if has_hub_bg:
+		_traffic_light(world, Vector2(520, 380), "s2_light", true)
 	else:
-		var pot := ColorRect.new()
-		pot.name = "Thermos"
-		pot.color = Color("94A3B8")
-		pot.position = Vector2(618, 210)
-		pot.size = Vector2(28, 44)
-		world.add_child(pot)
+		_traffic_light(world, Vector2(70, 175), "s1_light")
+		_traffic_light(world, Vector2(560, 400), "s2_light", true)
 
-	# S3 调度亭 + 时长屏（可闪红）
-	if ResourceLoader.exists("res://assets/sprites/props/dispatch_booth.png"):
-		var booth_sp := Sprite2D.new()
-		booth_sp.name = "DispatchBooth"
-		booth_sp.texture = load("res://assets/sprites/props/dispatch_booth.png")
-		booth_sp.centered = false
-		booth_sp.position = Vector2(930, 175)
-		booth_sp.scale = Vector2(1.6, 1.6)
-		booth_sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		world.add_child(booth_sp)
-	else:
-		var booth := ColorRect.new()
-		booth.color = Color("334155")
-		booth.position = Vector2(920, 180)
-		booth.size = Vector2(160, 110)
-		world.add_child(booth)
+	# AI 街景已含亭／桌时不再叠色块说明板，减噪
+	if not has_hub_bg:
+		var kiosk := ColorRect.new()
+		kiosk.color = Color("1E293B")
+		kiosk.position = Vector2(640, 450)
+		kiosk.size = Vector2(180, 120)
+		world.add_child(kiosk)
+		var kiosk_title := Label.new()
+		kiosk_title.text = "拆解台"
+		kiosk_title.position = Vector2(690, 456)
+		kiosk_title.add_theme_font_size_override("font_size", 16)
+		if UiTheme.ui_font:
+			kiosk_title.add_theme_font_override("font", UiTheme.ui_font)
+		world.add_child(kiosk_title)
+		var loop_a := Polygon2D.new()
+		loop_a.color = Color(AMBER.r, AMBER.g, AMBER.b, 0.85)
+		loop_a.polygon = PackedVector2Array([
+			Vector2(660, 520), Vector2(780, 520), Vector2(780, 500), Vector2(800, 530),
+			Vector2(780, 560), Vector2(780, 540), Vector2(660, 540)
+		])
+		world.add_child(loop_a)
+
+	# HUB 保温壶桌／调度亭叠层：有 AI 街景则不叠，避免挡玩法
+	if not has_hub_bg:
+		var table := ColorRect.new()
+		table.color = Color("78716C")
+		table.position = Vector2(600, 250)
+		table.size = Vector2(70, 18)
+		world.add_child(table)
+		if ResourceLoader.exists("res://assets/sprites/props/thermos.png"):
+			var pot_sp := Sprite2D.new()
+			pot_sp.name = "Thermos"
+			pot_sp.texture = load("res://assets/sprites/props/thermos.png")
+			pot_sp.centered = false
+			pot_sp.position = Vector2(610, 190)
+			pot_sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			world.add_child(pot_sp)
+		if ResourceLoader.exists("res://assets/sprites/props/dispatch_booth.png"):
+			var booth_sp := Sprite2D.new()
+			booth_sp.name = "DispatchBooth"
+			booth_sp.texture = load("res://assets/sprites/props/dispatch_booth.png")
+			booth_sp.centered = false
+			booth_sp.position = Vector2(930, 175)
+			booth_sp.scale = Vector2(1.6, 1.6)
+			booth_sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			world.add_child(booth_sp)
+	# 轻量时长屏反馈条（可闪红；不挡街景主体）
 	var screen := ColorRect.new()
 	screen.name = "TimingScreen"
-	screen.color = Color("0F766E")
-	screen.position = Vector2(955, 200)
-	screen.size = Vector2(100, 48)
+	screen.color = Color(0.06, 0.46, 0.43, 0.55)
+	screen.position = Vector2(1000, 168)
+	screen.size = Vector2(88, 28)
 	world.add_child(screen)
 	_fx_timing = screen
 	var screen_lab := Label.new()
 	screen_lab.name = "TimingLabel"
-	screen_lab.text = "时长屏"
-	screen_lab.position = Vector2(978, 214)
-	screen_lab.add_theme_font_size_override("font_size", 14)
+	screen_lab.text = "时长"
+	screen_lab.position = Vector2(1020, 170)
+	screen_lab.add_theme_font_size_override("font_size", 12)
 	if UiTheme.ui_font:
 		screen_lab.add_theme_font_override("font", UiTheme.ui_font)
 	world.add_child(screen_lab)
-	# 车流条
-	for i in range(5):
-		var car := ColorRect.new()
-		car.color = Color("F87171") if i < 3 else Color("4ADE80")
-		car.position = Vector2(900 + i * 36, 310)
-		car.size = Vector2(28, 14)
-		car.name = "CarFlow_%d" % i
-		world.add_child(car)
 
 	# 行人队列（S1）— 开场人流反馈
 	_fx_crowd = Node2D.new()
@@ -325,6 +307,29 @@ func _road(parent: Node2D, rect: Rect2, color: Color) -> void:
 		r.color = color
 		r.z_index = -15
 		parent.add_child(r)
+
+func _zone_chip(parent: Node2D, pos: Vector2, title: String, accent: Color) -> void:
+	var chip := ColorRect.new()
+	chip.position = pos
+	chip.size = Vector2(118, 26)
+	chip.color = Color(0.08, 0.1, 0.14, 0.55)
+	chip.z_index = -9
+	parent.add_child(chip)
+	var bar := ColorRect.new()
+	bar.position = pos
+	bar.size = Vector2(4, 26)
+	bar.color = accent
+	bar.z_index = -8
+	parent.add_child(bar)
+	var lab := Label.new()
+	lab.text = title
+	lab.position = pos + Vector2(10, 3)
+	lab.add_theme_font_size_override("font_size", 14)
+	if UiTheme.ui_font:
+		lab.add_theme_font_override("font", UiTheme.ui_font)
+	lab.add_theme_color_override("font_color", Color(1, 0.96, 0.9))
+	lab.z_index = -7
+	parent.add_child(lab)
 
 func _zone_pad(parent: Node2D, rect: Rect2, fill: Color, title: String, accent: Color) -> void:
 	var r := ColorRect.new()
@@ -678,15 +683,19 @@ func _play_intro(is_replay: bool) -> void:
 	var title: Label = modal.get_node("VBox/Title")
 	title.text = "开场委托" if not is_replay else "剧情回放（可随时关）"
 	var idx := [0]
+	# 首看不可跳过；二刷／已看过可关
 	var closable := is_replay or GameState.intro_seen
-	close_b.visible = true
-	close_b.text = "× 跳过/关闭"
+	close_b.visible = closable
+	close_b.disabled = not closable
+	close_b.text = "× 关闭" if closable else ""
 	body.text = _intro_frames[0]
 	for c in close_b.pressed.get_connections():
 		close_b.pressed.disconnect(c.callable)
 	for c in next_b.pressed.get_connections():
 		next_b.pressed.disconnect(c.callable)
 	close_b.pressed.connect(func():
+		if not (is_replay or GameState.intro_seen):
+			return
 		modal.visible = false
 		GameState.intro_seen = true
 		ClassroomBridge.emit_to_js("story:replay", {"fromFrame": 1, "closable": true, "closed": true})
@@ -715,9 +724,6 @@ func _play_intro(is_replay: bool) -> void:
 	)
 	# 首帧也给一点人流反馈
 	_intro_world_fx(0)
-	if not closable:
-		# first play still allow skip per design
-		pass
 	player.can_move = false
 
 func _on_replay_req(payload: Dictionary) -> void:
@@ -726,8 +732,9 @@ func _on_replay_req(payload: Dictionary) -> void:
 func _show_hub() -> void:
 	GameState.active_station = "hub"
 	player.can_move = true
-	_set_task("阿莲：先去引导台，把队伍排稳。点下方一键前往。")
-	GameState.set_focus("teleport_s1")
+	var next_id := _next_focus_id()
+	_set_task(_next_task_line(next_id))
+	GameState.set_focus(next_id)
 	_refresh_teleports()
 	_hide_stations()
 
@@ -762,7 +769,7 @@ func _teleport(station: String, pos: Vector2) -> void:
 func _open_s1() -> void:
 	_hide_stations()
 	GameState.active_station = "s1"
-	_set_task("①队伍乱了有人要乱穿 ②帮阿莲排地贴 ③排对能按序走并标出一直等")
+	_set_task("阿莲：把地贴步骤排对，再标出一直等的那步。")
 	# optional learn card short
 	s1.visible = true
 	if s1.has_method("open_station"):
@@ -793,7 +800,7 @@ func _open_s2_flow() -> void:
 func _open_s2a() -> void:
 	_hide_stations()
 	GameState.active_station = "s2a"
-	_set_task("①说不清『再等』停哪 ②帮阿莲拆灯态 ③回边接对灯会再闪")
+	_set_task("阿莲：把『一直等』改成带回箭头的。")
 	s2a.visible = true
 	if s2a.has_method("open_station"):
 		s2a.open_station()
@@ -820,7 +827,7 @@ func _open_s2c() -> void:
 func _open_s3() -> void:
 	_hide_stations()
 	GameState.active_station = "s3"
-	_set_task("①路口堵了时长错了 ②帮阿莲调时长 ③换规则再运行看是否缓解")
+	_set_task("阿莲：先运行看堵，再换时长后重跑。")
 	s3.visible = true
 	if s3.has_method("open_station"):
 		s3.open_station()
@@ -942,14 +949,55 @@ func _reset_current() -> void:
 		"s2c": _open_s2c()
 		"s3": _open_s3()
 
+func _next_focus_id() -> String:
+	if not GameState.intro_seen:
+		return "teleport_s1"
+	if not bool(GameState.stations.get(GameState.TASK_S1, false)):
+		return "teleport_s1"
+	var s2_done := bool(GameState.stations.get(GameState.TASK_S2A, false)) 		and bool(GameState.stations.get(GameState.TASK_S2B, false)) 		and bool(GameState.stations.get(GameState.TASK_S2C, false))
+	if not s2_done:
+		return "teleport_s2"
+	if not bool(GameState.stations.get(GameState.TASK_S3, false)):
+		return "teleport_s3"
+	return "exam"
+
+func _next_task_line(focus_id: String) -> String:
+	match focus_id:
+		"teleport_s1":
+			return "阿莲：先去引导台，把队伍排稳。"
+		"teleport_s2":
+			return "阿莲：前往拆解台，把『一直等』说清楚。"
+		"teleport_s3":
+			return "阿莲：调度亭还在堵，去调时长。"
+		"exam":
+			return "系统：三站稳住了，开始当课小测。"
+		_:
+			return "听阿莲安排，一站站帮上忙。"
+
 func _refresh_teleports() -> void:
-	# visual enable/disable by modulate
+	# 唯一「下一步」琥珀高亮；未解锁禁用；其余弱化
 	if teleport_bar == null:
 		return
-	# buttons: 0 s1, 1 s2, 2 s3, 3 hub
-	if teleport_bar.get_child_count() >= 3:
-		teleport_bar.get_child(1).disabled = not GameState.s2_unlocked()
-		teleport_bar.get_child(2).disabled = not GameState.s3_unlocked()
+	if teleport_bar.get_child_count() < 3:
+		return
+	(teleport_bar.get_child(1) as Button).disabled = not GameState.s2_unlocked()
+	(teleport_bar.get_child(2) as Button).disabled = not GameState.s3_unlocked()
+	var focus: String = _next_focus_id()
+	for i in mini(4, teleport_bar.get_child_count()):
+		var b: Button = teleport_bar.get_child(i)
+		b.modulate = Color(0.75, 0.78, 0.82, 1.0)
+	var idx: int = -1
+	match focus:
+		"teleport_s1":
+			idx = 0
+		"teleport_s2":
+			idx = 1
+		"teleport_s3":
+			idx = 2
+	if idx >= 0:
+		var nb: Button = teleport_bar.get_child(idx)
+		nb.modulate = Color(1.15, 0.95, 0.55, 1.0)
+		nb.disabled = false
 
 func _set_task(t: String) -> void:
 	if task_bar and task_bar.get_child_count() > 0:
