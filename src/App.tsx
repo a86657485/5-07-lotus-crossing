@@ -98,14 +98,16 @@ export default function App() {
 
   const persist = useCallback(
     async (patch: Partial<ServerState>) => {
-      if (!currentStudent) return;
+      if (!currentStudent) return false;
       try {
         const res = await apiSaveProgress(currentStudent.studentId, patch);
         setCurrentSession(res.state);
         syncBridgeContext(currentStudent, res.state);
         setSyncError('');
+        return true;
       } catch (err: any) {
         setSyncError(err?.message || '进度同步失败');
+        return false;
       }
     },
     [currentStudent]
@@ -142,7 +144,7 @@ export default function App() {
     }
   };
 
-  const handleCompleteStation1 = () => {
+  const handleCompleteStation1 = async () => {
     if (!currentStudent || !currentSession) return;
     const nextStations = { ...currentSession.stations, s1_order: true };
     const nextRelics = {
@@ -150,11 +152,12 @@ export default function App() {
       unlockedRelics: { ...currentSession.relics.unlockedRelics, whistle: true },
     };
     setCurrentSession({ ...currentSession, stations: nextStations, relics: nextRelics });
-    void persist({ stations: nextStations, relics: nextRelics });
-    setCurrentView('station2');
+    // 先等 POST /api/progress 落盘，再跳转，避免教师大屏仍「尚无证据」
+    const ok = await persist({ stations: nextStations, relics: nextRelics });
+    if (ok) setCurrentView('station2');
   };
 
-  const handleCompleteStation2 = () => {
+  const handleCompleteStation2 = async () => {
     if (!currentStudent || !currentSession) return;
     const nextStations = {
       ...currentSession.stations,
@@ -167,11 +170,11 @@ export default function App() {
       unlockedRelics: { ...currentSession.relics.unlockedRelics, arrow: true },
     };
     setCurrentSession({ ...currentSession, stations: nextStations, relics: nextRelics });
-    void persist({ stations: nextStations, relics: nextRelics });
-    setCurrentView('station3');
+    const ok = await persist({ stations: nextStations, relics: nextRelics });
+    if (ok) setCurrentView('station3');
   };
 
-  const handleCompleteStation3 = (detail: S3State) => {
+  const handleCompleteStation3 = async (detail: S3State) => {
     if (!currentStudent || !currentSession) return;
     const nextStations = { ...currentSession.stations, s3_timing: true };
     const nextRelics = {
@@ -184,8 +187,8 @@ export default function App() {
       stations: nextStations,
       relics: nextRelics,
     });
-    void persist({ stations: nextStations, relics: nextRelics, s3Detail: detail });
-    setCurrentView('exam');
+    const ok = await persist({ stations: nextStations, relics: nextRelics, s3Detail: detail });
+    if (ok) setCurrentView('exam');
   };
 
   const handleExamComplete = (result: ExamEvaluationResult, _answers: Record<string, any>) => {

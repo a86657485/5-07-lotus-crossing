@@ -38,9 +38,19 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
     return () => window.clearInterval(timer);
   }, [refresh]);
 
+  const serverRowsById = useMemo(() => {
+    const map = new Map<string, NonNullable<TeacherPayload['students']>[number]>();
+    for (const row of payload?.students || []) {
+      map.set(row.student.studentId, row);
+    }
+    return map;
+  }, [payload]);
+
   const sessions = useMemo(() => {
     const map: Record<string, StudentSessionRecord> = {};
     for (const row of payload?.students || []) {
+      // 仅真实进课会话进入 sessions，避免花名册全员被当成「有会话」
+      if (!row.entered) continue;
       map[row.student.studentId] = {
         student: row.student,
         startedAt: row.lastSync || '',
@@ -75,25 +85,28 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
       byId.set(row.student.studentId, row.student);
     }
     return Array.from(byId.values()).map(student => {
+      const serverRow = serverRowsById.get(student.studentId);
       const session = sessions[student.studentId];
+      const stations = serverRow?.stations;
       return {
         student,
         session,
-        isLoggedIn: !!session,
-        s1Ok: session?.stations.s1_order ?? false,
-        s2Ok: (session?.stations.s2_rewrite && session?.stations.s2_vs_branch && session?.stations.s2_kettle) ?? false,
-        s3Ok: session?.stations.s3_timing ?? false,
-        examScore: session?.examResult?.baseScore,
-        passed: session?.examResult?.passed ?? false,
-        g1Score: session?.examResult?.g1Score,
-        g2Score: session?.examResult?.g2Score,
-        challengeScore: session?.examResult?.challengeScore,
-        challengeBonus: session?.examResult?.challengePassed ?? false,
-        relicUsed: session?.relics.used ?? 0,
-        relicRemaining: session?.relics.remaining ?? 3,
+        // 必须以服务端 entered 为准（payload 含全员花名册行，不能用 !!session）
+        isLoggedIn: !!serverRow?.entered,
+        s1Ok: !!stations?.s1_order,
+        s2Ok: !!(stations?.s2_rewrite && stations?.s2_vs_branch && stations?.s2_kettle),
+        s3Ok: !!stations?.s3_timing,
+        examScore: serverRow?.examResult?.baseScore ?? session?.examResult?.baseScore,
+        passed: serverRow?.examResult?.passed ?? session?.examResult?.passed ?? false,
+        g1Score: serverRow?.examResult?.g1Score ?? session?.examResult?.g1Score,
+        g2Score: serverRow?.examResult?.g2Score ?? session?.examResult?.g2Score,
+        challengeScore: serverRow?.examResult?.challengeScore ?? session?.examResult?.challengeScore,
+        challengeBonus: serverRow?.examResult?.challengePassed ?? session?.examResult?.challengePassed ?? false,
+        relicUsed: serverRow?.relics?.used ?? session?.relics.used ?? 0,
+        relicRemaining: serverRow?.relics?.remaining ?? session?.relics.remaining ?? 3,
       };
     });
-  }, [sessions, rosterStudents, payload]);
+  }, [sessions, rosterStudents, payload, serverRowsById]);
 
   const totalRosterCount = payload?.denominator
     ?? (selectedClass === 'all'

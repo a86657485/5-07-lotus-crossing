@@ -56,4 +56,4 @@ DATA_DIR="$PWD/.data-test" PORT=8797 npm start
 
 ## 顺手观察（未修）
 
-主代理反馈：学生完成第 1 站后教师大屏 S1 仍「尚无证据」。粗看 `App.handleCompleteStation1` 会 `persist({ stations, relics })` → `POST /api/progress`；若 L5 手点已过但大屏无证据，更像是**该次 persist 未成功/未带上 s1_order**或教师聚合读到旧 state，而非 Godot 侧问题。Phase B **未大修** Web 同步，留给主代理继续查。
+主代理反馈：学生完成第 1 站后教师大屏 S1 仍「尚无证据」。粗看 `App.handleCompleteStation1` 会 `persist({ stations, relics })` → `POST /api/progress`；若 L5 手点已过但大屏无证据，更像是**该次 persist 未成功/未带上 s1_order**或教师聚合读到旧 state，而非 Godot 侧问题。已在同分支后续提交修复：教师 `entered` 在线判定 + 站完成 await persist + relics 可选链（见 Phase A「L5 教师大屏补丁」）。

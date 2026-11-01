@@ -473,9 +473,9 @@ function createService(options = {}) {
             used,
             remaining: RELIC_QUOTA - used,
             unlockedRelics: {
-              whistle: !!(body.relics.unlockedRelics?.whistle ?? state.relics.unlockedRelics.whistle),
-              arrow: !!(body.relics.unlockedRelics?.arrow ?? state.relics.unlockedRelics.arrow),
-              knob: !!(body.relics.unlockedRelics?.knob ?? state.relics.unlockedRelics.knob),
+              whistle: !!(body.relics.unlockedRelics?.whistle ?? state.relics?.unlockedRelics?.whistle),
+              arrow: !!(body.relics.unlockedRelics?.arrow ?? state.relics?.unlockedRelics?.arrow),
+              knob: !!(body.relics.unlockedRelics?.knob ?? state.relics?.unlockedRelics?.knob),
             },
           };
         }
