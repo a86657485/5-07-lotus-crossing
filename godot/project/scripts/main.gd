@@ -88,53 +88,53 @@ func _build_world() -> void:
 	world.name = "World"
 	add_child(world)
 
-	# 天空
-	var bg := ColorRect.new()
-	bg.color = SKY
-	bg.size = Vector2(1280, 720)
-	bg.z_index = -20
-	world.add_child(bg)
+	var has_hub_bg := ResourceLoader.exists("res://assets/sprites/ai/scenes/street_hub_bg.png") 		or ResourceLoader.exists("res://assets/sprites/scenes/street_hub_bg.png")
+	if has_hub_bg:
+		var bg_tex: Texture2D = null
+		if ResourceLoader.exists("res://assets/sprites/ai/scenes/street_hub_bg.png"):
+			bg_tex = load("res://assets/sprites/ai/scenes/street_hub_bg.png")
+		else:
+			bg_tex = load("res://assets/sprites/scenes/street_hub_bg.png")
+		var bg_sp := Sprite2D.new()
+		bg_sp.name = "StreetHubBG"
+		bg_sp.texture = bg_tex
+		bg_sp.centered = false
+		bg_sp.position = Vector2.ZERO
+		bg_sp.z_index = -20
+		bg_sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		world.add_child(bg_sp)
+		# 半透明分区标签，不盖死街景
+		_zone_pad(world, Rect2(24, 150, 420, 200), Color(0.1, 0.15, 0.22, 0.22), "S1 斑马线引导台", Color("38BDF8"))
+		_zone_pad(world, Rect2(470, 150, 340, 180), Color(0.1, 0.12, 0.16, 0.2), "HUB·莲花山南门", AMBER)
+		_zone_pad(world, Rect2(840, 150, 416, 200), Color(0.08, 0.14, 0.12, 0.22), "S3 信号调度亭", Color("34D399"))
+		_zone_pad(world, Rect2(160, 390, 960, 280), Color(0.08, 0.1, 0.14, 0.25), "S2 信号循环拆解台", ORANGE)
+	else:
+		# 天空 + 色块街景 fallback
+		var bg := ColorRect.new()
+		bg.color = SKY
+		bg.size = Vector2(1280, 720)
+		bg.z_index = -20
+		world.add_child(bg)
+		var hill := Polygon2D.new()
+		hill.color = Color("5B8FB9")
+		hill.polygon = PackedVector2Array([
+			Vector2(0, 90), Vector2(180, 40), Vector2(360, 70), Vector2(520, 30),
+			Vector2(720, 55), Vector2(900, 25), Vector2(1100, 60), Vector2(1280, 35),
+			Vector2(1280, 110), Vector2(0, 110)
+		])
+		hill.z_index = -18
+		world.add_child(hill)
+		_road(world, Rect2(0, 140, 1280, 220), ROAD)
+		_road(world, Rect2(480, 120, 320, 520), Color("455066"))
+		_zone_pad(world, Rect2(24, 150, 420, 200), Color(0.35, 0.45, 0.55, 0.45), "S1 斑马线引导台", Color("38BDF8"))
+		_zone_pad(world, Rect2(470, 150, 340, 180), Color(0.28, 0.35, 0.42, 0.5), "HUB·莲花山南门", AMBER)
+		_zone_pad(world, Rect2(840, 150, 416, 200), Color(0.22, 0.30, 0.40, 0.5), "S3 信号调度亭", Color("34D399"))
+		_zone_pad(world, Rect2(160, 390, 960, 280), Color(0.18, 0.24, 0.32, 0.55), "S2 信号循环拆解台", ORANGE)
+		_zebra(world, Vector2(60, 230), 360, 48, 8)
 
-	# 远景浅城廓／山剪影
-	var hill := Polygon2D.new()
-	hill.color = Color("5B8FB9")
-	hill.polygon = PackedVector2Array([
-		Vector2(0, 90), Vector2(180, 40), Vector2(360, 70), Vector2(520, 30),
-		Vector2(720, 55), Vector2(900, 25), Vector2(1100, 60), Vector2(1280, 35),
-		Vector2(1280, 110), Vector2(0, 110)
-	])
-	hill.z_index = -18
-	world.add_child(hill)
-	var hill2 := Polygon2D.new()
-	hill2.color = Color("6BA3C9")
-	hill2.polygon = PackedVector2Array([
-		Vector2(0, 100), Vector2(220, 70), Vector2(480, 95), Vector2(760, 60),
-		Vector2(1040, 90), Vector2(1280, 70), Vector2(1280, 120), Vector2(0, 120)
-	])
-	hill2.z_index = -17
-	world.add_child(hill2)
-
-	# 沥青主路（十字）
-	_road(world, Rect2(0, 140, 1280, 220), ROAD)  # 横
-	_road(world, Rect2(480, 120, 320, 520), Color("455066"))  # 纵偏 HUB/S2
-	# 路缘
-	_road(world, Rect2(0, 136, 1280, 6), CURB)
-	_road(world, Rect2(0, 356, 1280, 6), CURB)
-
-	# 分区底板（半透明可读，非纯灰大方块）
-	_zone_pad(world, Rect2(24, 150, 420, 200), Color(0.35, 0.45, 0.55, 0.45), "S1 斑马线引导台", Color("38BDF8"))
-	_zone_pad(world, Rect2(470, 150, 340, 180), Color(0.28, 0.35, 0.42, 0.5), "HUB·莲花山南门", AMBER)
-	_zone_pad(world, Rect2(840, 150, 416, 200), Color(0.22, 0.30, 0.40, 0.5), "S3 信号调度亭", Color("34D399"))
-	_zone_pad(world, Rect2(160, 390, 960, 280), Color(0.18, 0.24, 0.32, 0.55), "S2 信号循环拆解台", ORANGE)
-
-	# S1 斑马线
-	_zebra(world, Vector2(60, 230), 360, 48, 8)
-
-	# S1 人行灯柱
-	_traffic_light(world, Vector2(40, 170), "s1_light")
-
-	# S2 核心大灯柱
-	_traffic_light(world, Vector2(560, 430), "s2_light", true)
+	# S1 / S2 灯柱（优先 AI signal_prop）
+	_traffic_light(world, Vector2(70, 175), "s1_light")
+	_traffic_light(world, Vector2(560, 400), "s2_light", true)
 
 	# S2 流程图亭底板
 	var kiosk := ColorRect.new()
@@ -376,23 +376,26 @@ func _zebra(parent: Node2D, origin: Vector2, width: float, height: float, stripe
 		parent.add_child(s)
 
 func _traffic_light(parent: Node2D, origin: Vector2, name: String, big: bool = false) -> void:
-	var path := "res://assets/sprites/props/signal_red.png"
-	if ResourceLoader.exists(path):
+	var prop_paths := [
+		"res://assets/sprites/ai/props/signal_prop.png",
+		"res://assets/sprites/props/signal_prop.png",
+		"res://assets/sprites/props/signal_red.png",
+	]
+	for path in prop_paths:
+		if not ResourceLoader.exists(path):
+			continue
 		var sp := Sprite2D.new()
 		sp.name = name
 		sp.texture = load(path)
 		sp.centered = false
 		sp.position = origin
-		sp.scale = Vector2(1.35, 1.35) if big else Vector2(1.0, 1.0)
-		sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var th := float(sp.texture.get_height())
+		var target := 160.0 if big else 110.0
+		var s := target / maxf(1.0, th)
+		sp.scale = Vector2(s, s)
+		sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		parent.add_child(sp)
 		_fx_light_r = sp
-		# store state textures on meta for intro flash
-		sp.set_meta("tex_red", load("res://assets/sprites/props/signal_red.png"))
-		if ResourceLoader.exists("res://assets/sprites/props/signal_amber.png"):
-			sp.set_meta("tex_amber", load("res://assets/sprites/props/signal_amber.png"))
-		if ResourceLoader.exists("res://assets/sprites/props/signal_green.png"):
-			sp.set_meta("tex_green", load("res://assets/sprites/props/signal_green.png"))
 		return
 	var pole_h := 130 if big else 90
 	var pole := ColorRect.new()

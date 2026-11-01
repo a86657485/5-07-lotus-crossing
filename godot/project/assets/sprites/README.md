@@ -1,15 +1,14 @@
-# Sprites（godot-art-pack-v1 已接入）
+# Sprites
 
-来源：`design/godot-art-pack-v1/`（方案 A 橙马甲）。高精定稿可直接覆盖同名文件。
+优先：**`ai/`**（g5l7-godot-art-pack-v1.1-ai 生图升级）。  
+根目录色块包／旧 `characters/` 仅作 fallback。
 
-| 路径 | 用途 |
+| 优先路径 | 用途 |
 | --- | --- |
-| `player/idle_{down,left,right,up}.png` | 玩家四向 96×96 |
-| `player/player_4dir_sheet.png` | 横版 sheet 下→左→右→上 |
-| `alian/idle_*.png` + `portrait.png` | 阿莲地图／对白 |
-| `leader/idle_down.png` | 领队 |
-| `props/signal_*.png` | 灯柱四态 |
-| `props/thermos.png` / `dispatch_booth.png` | 壶／调度亭 |
-| `tiles/*_tile.png` | 沥青／斑马／路缘 |
-| `fx/focus_ring*.png` | 脚底焦点环＋pulse |
-| `characters/` | 与美术包同名扁平副本 |
+| `ai/characters/player_{down,left,right,up}.png` | 玩家四向 |
+| `ai/characters/player_4dir_sheet.png` | 四向合图 |
+| `ai/characters/alian_front.png` | 阿莲 |
+| `ai/scenes/street_hub_bg.png` | 路口一屏 1280×720 |
+| `ai/props/signal_prop.png` | 灯柱 |
+| `ai/fx/focus_ring.png` | 脚底 FocusRing |
+| `player/` `alian/` `fx/` `props/` `scenes/` | 运行时主路径（已用 AI 覆盖） |

@@ -1,5 +1,5 @@
 extends RefCounted
-## 优先加载 art-pack 精灵；缺文件时回退色块二头身
+## 优先 AI 生图；缺文件回退色块。大图自动缩到约 96px 高。
 
 const ORANGE := Color("F97316")
 const STRIPE := Color("FDE68A")
@@ -10,47 +10,61 @@ const HAIR := Color("1F2937")
 const BOOT := Color("111827")
 const LEADER_NAVY := Color("1E3A5F")
 const HELMET := Color("FBBF24")
+const TARGET_H := 96.0
 
-static func try_tex(path: String) -> Texture2D:
-	if ResourceLoader.exists(path):
-		return load(path) as Texture2D
+static func try_tex(paths: Array) -> Texture2D:
+	for path in paths:
+		if ResourceLoader.exists(path):
+			return load(path) as Texture2D
 	return null
 
-static func _sprite(parent: Node2D, tex: Texture2D, y: float = -8.0, scale: float = 1.0) -> Sprite2D:
+static func _fit_scale(tex: Texture2D, target_h: float = TARGET_H) -> float:
+	var h := float(tex.get_height())
+	if h <= 1.0:
+		return 1.0
+	return target_h / h
+
+static func _sprite(parent: Node2D, tex: Texture2D, y: float, target_h: float) -> Sprite2D:
 	var sp := Sprite2D.new()
 	sp.name = "Sprite"
 	sp.texture = tex
 	sp.centered = true
 	sp.position = Vector2(0, y)
-	sp.scale = Vector2(scale, scale)
-	sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var s := _fit_scale(tex, target_h)
+	sp.scale = Vector2(s, s)
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	parent.add_child(sp)
 	return sp
 
 static func make_player(parent: Node2D) -> void:
-	var tex := try_tex("res://assets/sprites/player/idle_down.png")
-	if tex == null:
-		tex = try_tex("res://assets/sprites/characters/player_down.png")
+	var tex := try_tex([
+		"res://assets/sprites/ai/characters/player_down.png",
+		"res://assets/sprites/player/idle_down.png",
+		"res://assets/sprites/characters/player_down.png",
+	])
 	if tex:
-		_sprite(parent, tex, -8, 1.0)
+		_sprite(parent, tex, -8, 100.0)
 		return
 	_build_chibi(parent, {"taller": false, "vest": ORANGE, "shirt": SHIRT, "pants": SHORTS, "hair": HAIR, "helmet": false, "tablet": false})
 
 static func make_alian(parent: Node2D) -> void:
-	var tex := try_tex("res://assets/sprites/alian/idle_down.png")
-	if tex == null:
-		tex = try_tex("res://assets/sprites/characters/alian_down.png")
+	var tex := try_tex([
+		"res://assets/sprites/ai/characters/alian_front.png",
+		"res://assets/sprites/alian/idle_down.png",
+		"res://assets/sprites/characters/alian_down.png",
+	])
 	if tex:
-		_sprite(parent, tex, -10, 1.05)
+		_sprite(parent, tex, -12, 118.0)
 		return
 	_build_chibi(parent, {"taller": true, "vest": ORANGE, "shirt": Color("F8FAFC"), "pants": Color("1F2937"), "hair": Color("292524"), "helmet": false, "tablet": true})
 
 static func make_leader(parent: Node2D) -> void:
-	var tex := try_tex("res://assets/sprites/leader/idle_down.png")
-	if tex == null:
-		tex = try_tex("res://assets/sprites/characters/captain_down.png")
+	var tex := try_tex([
+		"res://assets/sprites/leader/idle_down.png",
+		"res://assets/sprites/characters/captain_down.png",
+	])
 	if tex:
-		_sprite(parent, tex, -10, 1.05)
+		_sprite(parent, tex, -10, 110.0)
 		return
 	_build_chibi(parent, {"taller": true, "vest": ORANGE, "shirt": LEADER_NAVY, "pants": Color("1F2937"), "hair": HAIR, "helmet": true, "tablet": false})
 

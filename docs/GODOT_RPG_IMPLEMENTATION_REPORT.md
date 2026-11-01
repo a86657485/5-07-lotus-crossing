@@ -50,3 +50,9 @@ PORT=8797 DATA_DIR=.data-test npm start
 - Mood Board 备查同步 `lotus/design/godot-art-pack-v1/moodboard/`
 - 截图已更新：`docs/screenshots/07_visual_hub.png`、`08_s1_play.png`
 - smoke ok；HTML5 已重导出 `public/godot/`
+
+## 2026-11-01 AI 生图包 v1.1 优先接入
+- 源：`design/godot-art-pack-v1/ai/` → `godot/project/assets/sprites/ai/`（并覆盖 player/alian/fx/props/scenes 主路径）
+- 必嵌：玩家四向、alian_front、street_hub_bg 1280×720、signal_prop、focus_ring；根目录色块仅 fallback
+- 截图更新：`docs/screenshots/07_visual_hub.png`、`08_s1_play.png`
+- `public/godot/` 已重导出；8797 `server.cjs` 已确认

@@ -1,5 +1,5 @@
 extends CharacterBody2D
-## 玩家四向精灵切换（art-pack idle_*）
+## 玩家四向：优先 AI 路径
 
 const SPEED := 180.0
 
@@ -9,9 +9,14 @@ var _tex: Dictionary = {}
 
 func _ready() -> void:
 	for d in ["down", "left", "right", "up"]:
-		var path := "res://assets/sprites/player/idle_%s.png" % d
-		if ResourceLoader.exists(path):
-			_tex[d] = load(path)
+		var paths := [
+			"res://assets/sprites/ai/characters/player_%s.png" % d,
+			"res://assets/sprites/player/idle_%s.png" % d,
+		]
+		for path in paths:
+			if ResourceLoader.exists(path):
+				_tex[d] = load(path)
+				break
 	_apply_facing("down")
 
 func _physics_process(_delta: float) -> void:
