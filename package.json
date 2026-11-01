@@ -1,0 +1,37 @@
+{
+  "name": "lotus-crossing-5-07",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "五年级第7课《重复操作用循环》·莲花山智慧路口·临时小交警",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "tsx --test src/utils/evaluation.test.ts",
+    "server": "node --no-warnings server.cjs",
+    "start": "node --no-warnings server.cjs"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@vitejs/plugin-react": "^4.7.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.11",
+    "vite": "^6.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "typescript": "~5.9.3",
+    "tsx": "^4.21.0"
+  }
+}
