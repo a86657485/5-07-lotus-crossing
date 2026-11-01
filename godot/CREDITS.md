@@ -10,3 +10,8 @@
 ## 外引素材
 - 当前 MVP 使用 ColorRect／程序化色块占位，**未引入** Kenney 等外部图集。
 - 若后续换用 CC0 瓦片／精灵，须在本文件增补来源、许可与使用文件列表。
+
+## 字体
+- **Noto Sans CJK SC**（`assets/fonts/NotoSansSC-Regular.ttf`，自 NotoSansCJK-Regular.ttc 提取 SC 字面）— SIL Open Font License 1.1  
+  来源：Google Noto CJK / `/usr/share/fonts/opentype/noto/`  
+- 另附课文用字子集 `NotoSansSC-Lesson.ttf`（同许可）作瘦身备选。

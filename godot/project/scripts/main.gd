@@ -36,14 +36,27 @@ var _intro_frames: Array = [
 ]
 
 func _ready() -> void:
+	# Node 根无 theme 属性；全局字体由 UiTheme 挂到 root.theme
 	_build_world()
 	_build_ui()
 	_build_stations()
+	if UiTheme.app_theme:
+		UiTheme.apply_to(station_host)
+		UiTheme.apply_to(task_bar)
+		UiTheme.apply_to(relic_hud)
+		UiTheme.apply_to(dialogue)
+		UiTheme.apply_to(learn_card)
+		UiTheme.apply_to(story_replay)
 	ClassroomBridge.session_received.connect(_on_session)
 	ClassroomBridge.story_replay_request.connect(_on_replay_req)
 	GameState.exam_opened.connect(_on_exam_opened)
 	GameState.stations_changed.connect(_refresh_teleports)
 	call_deferred("_start_flow")
+	if "--smoke" in OS.get_cmdline_user_args() or "--smoke" in OS.get_cmdline_args():
+		call_deferred("_smoke_playthrough")
+	if "--shot-s1" in OS.get_cmdline_args() or "--shot-s1" in OS.get_cmdline_user_args():
+		call_deferred("_shot_s1")
+
 
 func _start_flow() -> void:
 	if GameState.intro_seen:
@@ -168,7 +181,10 @@ func _zone(parent: Node2D, rect: Rect2, color: Color, title: String) -> void:
 	var lab := Label.new()
 	lab.text = title
 	lab.position = rect.position + Vector2(12, 8)
-	lab.add_theme_font_size_override("font_size", 18)
+	lab.add_theme_font_size_override("font_size", 20)
+	if UiTheme.ui_font:
+		lab.add_theme_font_override("font", UiTheme.ui_font)
+	lab.add_theme_color_override("font_color", Color(1, 0.95, 0.85))
 	parent.add_child(lab)
 
 func _build_ui() -> void:
@@ -211,18 +227,29 @@ func _build_ui() -> void:
 	for item in [["前往引导台", "s1", Vector2(200, 220)], ["前往拆解台", "s2", Vector2(640, 480)], ["前往调度台", "s3", Vector2(1000, 220)], ["回枢纽", "hub", Vector2(640, 200)]]:
 		var b := Button.new()
 		b.text = item[0]
-		b.custom_minimum_size = Vector2(140, 40)
+		b.custom_minimum_size = Vector2(160, 48)
+		if UiTheme.ui_font:
+			b.add_theme_font_override("font", UiTheme.ui_font)
+			b.add_theme_font_size_override("font_size", 18)
 		b.pressed.connect(_teleport.bind(str(item[1]), item[2]))
 		teleport_bar.add_child(b)
 
 	var replay_btn := Button.new()
 	replay_btn.text = "剧情回放"
+	replay_btn.custom_minimum_size = Vector2(140, 48)
+	if UiTheme.ui_font:
+		replay_btn.add_theme_font_override("font", UiTheme.ui_font)
+		replay_btn.add_theme_font_size_override("font_size", 18)
 	replay_btn.pressed.connect(func(): _play_intro(true))
 	teleport_bar.add_child(replay_btn)
 
 	reset_btn = Button.new()
 	reset_btn.name = "StationResetBtn"
 	reset_btn.text = "重做本关"
+	reset_btn.custom_minimum_size = Vector2(140, 48)
+	if UiTheme.ui_font:
+		reset_btn.add_theme_font_override("font", UiTheme.ui_font)
+		reset_btn.add_theme_font_size_override("font_size", 18)
 	reset_btn.pressed.connect(_reset_current)
 	teleport_bar.add_child(reset_btn)
 
@@ -304,6 +331,8 @@ func _load_station(p_name: String, script_path: String, tree_builder: Callable) 
 	root.add_child(panel)
 	tree_builder.call(panel)
 	root.set_script(load(script_path))
+	if UiTheme.app_theme:
+		UiTheme.apply_to(root)
 	return root
 
 func _s1_tree(panel: PanelContainer) -> void:
@@ -660,3 +689,63 @@ func _set_task(t: String) -> void:
 func _toast(msg: String) -> void:
 	_set_task(msg)
 	print("[G5L7] ", msg)
+
+
+func _smoke_playthrough() -> void:
+	await get_tree().process_frame
+	await get_tree().create_timer(0.2).timeout
+	if story_replay and story_replay.visible:
+		story_replay.visible = false
+	GameState.intro_seen = true
+	_show_hub()
+	await get_tree().process_frame
+	_open_s1()
+	await get_tree().process_frame
+	for id in ["arrive", "wait_green", "green_go", "cross_alert", "arrive_other"]:
+		s1._on_pool_pick(id)
+	s1._submit()
+	await get_tree().process_frame
+	s1._on_pick_waiting("wait_green")
+	s1._submit()
+	await get_tree().process_frame
+	if learn_card and learn_card.visible:
+		learn_card.get_node("VBox/HBox/NextBtn").pressed.emit()
+		await get_tree().process_frame
+	if s2a.visible:
+		s2a._pick("cond", "cond_not_green", "")
+		s2a._pick("repeat", "repeat_observe", "")
+		s2a._pick("back", "back_to_repeat", "")
+		s2a._lock()
+		await get_tree().process_frame
+	if s2b.visible:
+		s2b._select("loop")
+		s2b._submit()
+		await get_tree().process_frame
+	if s2c.visible:
+		s2c._pick("cond", "water_low")
+		s2c._pick("repeat", "keep_heat")
+		s2c._pick("timing", "ask_first")
+		s2c._submit()
+		await get_tree().process_frame
+	_open_s3()
+	await get_tree().process_frame
+	if s3.visible:
+		s3._run()
+		s3._pick("strat", "extend_green_car")
+		s3._pick("reason", "serve_junction")
+		s3._run()
+		s3._submit()
+		await get_tree().process_frame
+	var ok := bool(GameState.stations["s1_order"]) and bool(GameState.stations["s2_rewrite"]) and bool(GameState.stations["s2_vs_branch"]) and bool(GameState.stations["s2_kettle"]) and bool(GameState.stations["s3_timing"])
+	print("[smoke] FINAL=", GameState.stations, " ok=", ok, " font=", UiTheme.ui_font != null)
+	get_tree().quit(0 if ok else 1)
+
+
+func _shot_s1() -> void:
+	await get_tree().create_timer(0.3).timeout
+	if story_replay:
+		story_replay.visible = false
+	GameState.intro_seen = true
+	_show_hub()
+	await get_tree().process_frame
+	_open_s1()
