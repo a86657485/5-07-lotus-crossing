@@ -1,0 +1,11 @@
+node_modules/
+dist/
+runtime/
+.data-test/
+.DS_Store
+.env
+.env.local
+*.log
+.aistudio/
+*.sqlite
+*.sqlite-*
