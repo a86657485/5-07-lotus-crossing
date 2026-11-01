@@ -1,6 +1,22 @@
 import { ExamEvaluationResult } from '../types';
 import { SERVER_QUESTIONS, STANDARD_ANSWERS } from '../data/questionsData';
 
+/** Align with quiz.cjs: single-slot objects vs string card picks. */
+function answerScalar(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const vals = Object.values(value as Record<string, unknown>);
+    if (
+      vals.length === 1 &&
+      (typeof vals[0] === 'string' || typeof vals[0] === 'number' || typeof vals[0] === 'boolean')
+    ) {
+      return String(vals[0]).trim();
+    }
+    return null;
+  }
+  return String(value).trim();
+}
+
 export function evaluateExam(answers: Record<string, any>): ExamEvaluationResult {
   let baseScore = 0;
   let g1Score = 0;
@@ -27,7 +43,13 @@ export function evaluateExam(answers: Record<string, any>): ExamEvaluationResult
           isCorrect = keys.length > 0 && keys.every(k => userAnswer[k] === stdAnswer[k]);
         }
       } else {
-        isCorrect = String(userAnswer).trim() === String(stdAnswer).trim();
+        const u = answerScalar(userAnswer);
+        const s = answerScalar(stdAnswer);
+        if (u !== null && s !== null) {
+          isCorrect = u === s;
+        } else {
+          isCorrect = String(userAnswer).trim() === String(stdAnswer).trim();
+        }
       }
     }
 
