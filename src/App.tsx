@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LoginView } from './components/views/LoginView';
-import { IntroStoryModal } from './components/views/IntroStoryModal';
-import { MainIntersectionMap } from './components/views/MainIntersectionMap';
-import { Station1CrosswalkView } from './components/views/Station1CrosswalkView';
-import { Station2LoopAnalysisView } from './components/views/Station2LoopAnalysisView';
-import { Station3TimingDispatchView } from './components/views/Station3TimingDispatchView';
 import { ExamView } from './components/views/ExamView';
 import { RewardLoopGame } from './components/views/RewardLoopGame';
 import { TeacherDashboardView } from './components/views/TeacherDashboardView';
+import { GodotPlayView } from './components/views/GodotPlayView';
 import {
   ExamEvaluationResult,
   RelicState,
@@ -69,10 +65,7 @@ export default function App() {
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [currentSession, setCurrentSession] = useState<ServerState | null>(null);
   const [syncError, setSyncError] = useState('');
-  const [currentView, setCurrentView] = useState<
-    'login' | 'intro' | 'map' | 'station1' | 'station2' | 'station3' | 'exam' | 'reward_game'
-  >('login');
-  const [hasPlayedIntroOnce, setHasPlayedIntroOnce] = useState(false);
+  const [currentView, setCurrentView] = useState<'login' | 'godot' | 'exam' | 'reward_game'>('login');
 
   const persist = useCallback(
     async (patch: Partial<ServerState>) => {
@@ -102,7 +95,8 @@ export default function App() {
       });
       setCurrentStudent(res.student);
       setCurrentSession(res.state);
-      setCurrentView('intro');
+      // 主玩法改走 Godot HTML5（导入可跳过在引擎内）
+      setCurrentView('godot');
     } catch (err: any) {
       setSyncError(err?.message || '登录失败，请确认课堂服务已启动');
     }
@@ -113,55 +107,50 @@ export default function App() {
     try {
       const res = await apiUseRelic(currentStudent.studentId);
       setCurrentSession(res.state);
+       (window as any).G5L7Classroom?.emit?.('relic:sync', {
+        remaining: res.state.relics?.remaining ?? 0,
+      });
     } catch (err: any) {
       setSyncError(err?.message || '法宝使用失败');
     }
   };
 
-  const handleCompleteStation1 = () => {
+  const handleEvidence = (envelope: any) => {
     if (!currentStudent || !currentSession) return;
-    const nextStations = { ...currentSession.stations, s1_order: true };
-    const nextRelics = {
-      ...currentSession.relics,
-      unlockedRelics: { ...currentSession.relics.unlockedRelics, whistle: true },
-    };
-    setCurrentSession({ ...currentSession, stations: nextStations, relics: nextRelics });
-    void persist({ stations: nextStations, relics: nextRelics });
-    setCurrentView('station2');
-  };
+    const taskId = envelope?.taskId as TaskId | string;
+    const nextStations = { ...currentSession.stations };
+    const nextRelics = { ...currentSession.relics, unlockedRelics: { ...currentSession.relics.unlockedRelics } };
+    let nextS3 = currentSession.s3Detail;
 
-  const handleCompleteStation2 = () => {
-    if (!currentStudent || !currentSession) return;
-    const nextStations = {
-      ...currentSession.stations,
-      s2_rewrite: true,
-      s2_vs_branch: true,
-      s2_kettle: true,
-    };
-    const nextRelics = {
-      ...currentSession.relics,
-      unlockedRelics: { ...currentSession.relics.unlockedRelics, arrow: true },
-    };
-    setCurrentSession({ ...currentSession, stations: nextStations, relics: nextRelics });
-    void persist({ stations: nextStations, relics: nextRelics });
-    setCurrentView('station3');
-  };
+    if (taskId === 's1_order' && envelope?.correct) {
+      nextStations.s1_order = true;
+      nextRelics.unlockedRelics.whistle = true;
+    }
+    if (taskId === 's2_rewrite' && envelope?.correct) nextStations.s2_rewrite = true;
+    if (taskId === 's2_vs_branch' && envelope?.correct) nextStations.s2_vs_branch = true;
+    if (taskId === 's2_kettle' && envelope?.correct) {
+      nextStations.s2_kettle = true;
+      nextRelics.unlockedRelics.arrow = true;
+    }
+    if (taskId === 's3_timing' && envelope?.correct) {
+      nextStations.s3_timing = true;
+      nextRelics.unlockedRelics.knob = true;
+      if (envelope?.s3Detail) nextS3 = envelope.s3Detail;
+      else if (envelope?.payload) {
+        nextS3 = {
+          ...nextS3,
+          faultObserved: !!envelope.payload.faultObserved,
+          strategy: envelope.payload.strategyId || nextS3.strategy,
+          reason: envelope.payload.reasonId || nextS3.reason,
+          ruleChanged: true,
+          revalidateOk: !!envelope.payload.revalidateOk,
+        };
+      }
+    }
 
-  const handleCompleteStation3 = (detail: S3State) => {
-    if (!currentStudent || !currentSession) return;
-    const nextStations = { ...currentSession.stations, s3_timing: true };
-    const nextRelics = {
-      ...currentSession.relics,
-      unlockedRelics: { ...currentSession.relics.unlockedRelics, knob: true },
-    };
-    setCurrentSession({
-      ...currentSession,
-      s3Detail: detail,
-      stations: nextStations,
-      relics: nextRelics,
-    });
-    void persist({ stations: nextStations, relics: nextRelics, s3Detail: detail });
-    setCurrentView('exam');
+    const patch: Partial<ServerState> = { stations: nextStations, relics: nextRelics, s3Detail: nextS3 };
+    setCurrentSession({ ...currentSession, ...patch });
+    void persist(patch);
   };
 
   const handleExamComplete = (result: ExamEvaluationResult, _answers: Record<string, any>) => {
@@ -172,20 +161,6 @@ export default function App() {
       examResult: result,
       rewardUnlocked: result.passed,
     });
-  };
-
-  const handleResetStation = (taskId: TaskId) => {
-    if (!currentStudent || !currentSession) return;
-    const nextStations = { ...currentSession.stations };
-    if (taskId === 's1_order') nextStations.s1_order = false;
-    if (taskId === 's2_rewrite') {
-      nextStations.s2_rewrite = false;
-      nextStations.s2_vs_branch = false;
-      nextStations.s2_kettle = false;
-    }
-    if (taskId === 's3_timing') nextStations.s3_timing = false;
-    setCurrentSession({ ...currentSession, stations: nextStations });
-    void persist({ stations: nextStations });
   };
 
   if (isTeacherRoute) {
@@ -221,58 +196,20 @@ export default function App() {
         </div>
       )}
 
-      {currentView === 'intro' && (
-        <IntroStoryModal
-          isReplay={hasPlayedIntroOnce}
-          onComplete={() => {
-            setHasPlayedIntroOnce(true);
-            setCurrentView('map');
-          }}
-          onSkip={() => {
-            setHasPlayedIntroOnce(true);
-            setCurrentView('map');
-          }}
-        />
-      )}
-
-      {currentView === 'map' && (
-        <MainIntersectionMap
+      {currentView === 'godot' && (
+        <GodotPlayView
           student={currentStudent}
           progress={currentProgress}
           relics={currentRelics}
           s3State={currentS3State}
-          onOpenStation={taskId => {
-            if (taskId === 's1_order') setCurrentView('station1');
-            if (taskId === 's2_rewrite') setCurrentView('station2');
-            if (taskId === 's3_timing') setCurrentView('station3');
-            if (taskId === 'exam') setCurrentView('exam');
+          onEvidence={handleEvidence}
+          onExamOpen={() => setCurrentView('exam')}
+          onRelicUse={() => void handleUseRelic()}
+          onS3Detail={detail => {
+            if (!currentSession) return;
+            setCurrentSession({ ...currentSession, s3Detail: detail });
+            void persist({ s3Detail: detail });
           }}
-          onUseRelic={handleUseRelic}
-          onReplayIntro={() => setCurrentView('intro')}
-          onResetStation={handleResetStation}
-          onOpenRewardGame={() => setCurrentView('reward_game')}
-          rewardUnlocked={currentSession?.rewardUnlocked}
-        />
-      )}
-
-      {currentView === 'station1' && (
-        <Station1CrosswalkView
-          onComplete={handleCompleteStation1}
-          onBackToMap={() => setCurrentView('map')}
-        />
-      )}
-
-      {currentView === 'station2' && (
-        <Station2LoopAnalysisView
-          onComplete={handleCompleteStation2}
-          onBackToMap={() => setCurrentView('map')}
-        />
-      )}
-
-      {currentView === 'station3' && (
-        <Station3TimingDispatchView
-          onComplete={handleCompleteStation3}
-          onBackToMap={() => setCurrentView('map')}
         />
       )}
 
@@ -281,12 +218,12 @@ export default function App() {
           studentId={currentStudent.studentId}
           onExamComplete={handleExamComplete}
           onOpenRewardGame={() => setCurrentView('reward_game')}
-          onBackToMap={() => setCurrentView('map')}
+          onBackToMap={() => setCurrentView('godot')}
         />
       )}
 
       {currentView === 'reward_game' && (
-        <RewardLoopGame onBackToMap={() => setCurrentView('map')} />
+        <RewardLoopGame onBackToMap={() => setCurrentView('godot')} />
       )}
     </div>
   );
