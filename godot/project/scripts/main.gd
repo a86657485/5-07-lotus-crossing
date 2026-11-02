@@ -20,6 +20,8 @@ var story_replay: Control
 var reset_btn: Button
 var teleport_bar: HBoxContainer
 var station_host: Control
+var quest_drawer: Control
+var move_lock_reasons: Dictionary = {}
 var world: Node2D
 
 var s1: Control
@@ -61,6 +63,8 @@ func _ready() -> void:
 		UiTheme.apply_to(dialogue)
 		UiTheme.apply_to(learn_card)
 		UiTheme.apply_to(story_replay)
+		if quest_drawer:
+			UiTheme.apply_to(quest_drawer)
 	ClassroomBridge.session_received.connect(_on_session)
 	ClassroomBridge.story_replay_request.connect(_on_replay_req)
 	GameState.exam_opened.connect(_on_exam_opened)
@@ -78,7 +82,7 @@ func _start_flow() -> void:
 	if GameState.intro_seen:
 		_show_hub()
 	else:
-		_play_intro(false)
+		_play_intro_illustrated(false)
 
 func _on_session(_data: Dictionary) -> void:
 	_refresh_teleports()
@@ -509,7 +513,7 @@ func _build_ui() -> void:
 	if UiTheme.ui_font:
 		replay_btn.add_theme_font_override("font", UiTheme.ui_font)
 		replay_btn.add_theme_font_size_override("font_size", 18)
-	replay_btn.pressed.connect(func(): _play_intro(true))
+	replay_btn.pressed.connect(func(): _play_intro_illustrated(true))
 	teleport_bar.add_child(replay_btn)
 
 	reset_btn = Button.new()
@@ -522,10 +526,20 @@ func _build_ui() -> void:
 	reset_btn.pressed.connect(_reset_current)
 	teleport_bar.add_child(reset_btn)
 
-	# Dialogue
-	dialogue = _make_modal("DialogueBox", Vector2(320, 520), Vector2(640, 160))
+	# Dialogue with illustration
+	dialogue = _build_dialogue_box()
 	ui.add_child(dialogue)
 	dialogue.visible = false
+	if dialogue.has_signal("visibility_changed_for_move"):
+		dialogue.visibility_changed_for_move.connect(func(open: bool): _set_move_lock("dialogue", open))
+
+	# Quest drawer (主线任务／操作帮助)
+	quest_drawer = Control.new()
+	quest_drawer.name = "QuestDrawer"
+	quest_drawer.set_script(load("res://scripts/ui/quest_drawer.gd"))
+	ui.add_child(quest_drawer)
+	if quest_drawer.has_signal("open_changed"):
+		quest_drawer.open_changed.connect(func(open: bool): _set_move_lock("quest", open))
 
 	# Learn card
 	learn_card = _make_modal("LearnCard", Vector2(280, 120), Vector2(720, 400))
@@ -575,8 +589,8 @@ func _make_modal(p_name: String, pos: Vector2, size: Vector2) -> PanelContainer:
 	return p
 
 func _build_stations() -> void:
-	s1 = _load_station("S1", "res://scripts/stations/s1_order.gd", _s1_tree)
-	s2a = _load_station("S2A", "res://scripts/stations/s2_rewrite.gd", _s2a_tree)
+	s1 = _load_station("S1", "res://scripts/stations/s2_rewrite.gd", _s1_tree)
+	s2a = _load_station("S2A", "res://scripts/stations/s2_vs_branch.gd", _s2b_tree)  # 旧入口兼容，实际走 _open_s2b
 	s2b = _load_station("S2B", "res://scripts/stations/s2_vs_branch.gd", _s2b_tree)
 	s2c = _load_station("S2C", "res://scripts/stations/s2_kettle.gd", _s2c_tree)
 	s3 = _load_station("S3", "res://scripts/stations/s3_timing.gd", _s3_tree)
@@ -605,15 +619,11 @@ func _load_station(p_name: String, script_path: String, tree_builder: Callable) 
 	return root
 
 func _s1_tree(panel: PanelContainer) -> void:
-	var vb := VBoxContainer.new()
-	vb.name = "VBox"
-	panel.add_child(vb)
-	_lab(vb, "Prompt", "S1")
-	_lab(vb, "PedFeedback", "")
-	var pool := HBoxContainer.new(); pool.name = "Pool"; vb.add_child(pool)
-	var slots := HBoxContainer.new(); slots.name = "Slots"; vb.add_child(slots)
-	var cand := HBoxContainer.new(); cand.name = "Candidates"; vb.add_child(cand)
-	vb.add_child(_tools())
+	# 流程图板由 s2_rewrite.gd 在 Panel 内自建；此处只留空壳
+	var host := Control.new()
+	host.name = "BoardHost"
+	host.custom_minimum_size = Vector2(1080, 540)
+	panel.add_child(host)
 
 func _s2a_tree(panel: PanelContainer) -> void:
 	var vb := VBoxContainer.new(); vb.name = "VBox"; panel.add_child(vb)
@@ -626,23 +636,10 @@ func _s2a_tree(panel: PanelContainer) -> void:
 	vb.add_child(tools)
 
 func _s2b_tree(panel: PanelContainer) -> void:
-	var vb := VBoxContainer.new(); vb.name = "VBox"; panel.add_child(vb)
-	_lab(vb, "Prompt", "S2-B")
-	_lab(vb, "AnimFeedback", "")
-	var screens := HBoxContainer.new(); screens.name = "Screens"; vb.add_child(screens)
-	var lb := Button.new(); lb.name = "LoopBtn"; lb.text = "左屏·循环（有回边）"; screens.add_child(lb)
-	var bb := Button.new(); bb.name = "BranchBtn"; bb.text = "右屏·分支（选路一次）"; screens.add_child(bb)
-	var eb := Button.new(); eb.name = "EdgeBtn"; eb.text = "高亮回边"; vb.add_child(eb)
-	vb.add_child(_tools())
+	var host := Control.new(); host.name = "BoardHost"; host.custom_minimum_size = Vector2(1080, 540); panel.add_child(host)
 
 func _s2c_tree(panel: PanelContainer) -> void:
-	var vb := VBoxContainer.new(); vb.name = "VBox"; panel.add_child(vb)
-	_lab(vb, "Prompt", "S2-C")
-	_lab(vb, "PotAnim", "")
-	var r1 := HBoxContainer.new(); r1.name = "CondRow"; vb.add_child(r1)
-	var r2 := HBoxContainer.new(); r2.name = "RepeatRow"; vb.add_child(r2)
-	var r3 := HBoxContainer.new(); r3.name = "TimingRow"; vb.add_child(r3)
-	vb.add_child(_tools())
+	var host := Control.new(); host.name = "BoardHost"; host.custom_minimum_size = Vector2(1080, 540); panel.add_child(host)
 
 func _s3_tree(panel: PanelContainer) -> void:
 	var vb := VBoxContainer.new(); vb.name = "VBox"; panel.add_child(vb)
@@ -672,6 +669,134 @@ func _tools() -> HBoxContainer:
 	var sub := Button.new(); sub.name = "SubmitBtn"; sub.text = "确认"; tools.add_child(sub)
 	var back := Button.new(); back.name = "BackBtn"; back.text = "回地图"; tools.add_child(back)
 	return tools
+
+
+
+func _build_dialogue_box() -> Control:
+	var root := Control.new()
+	root.name = "DialogueBox"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.35)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(dim)
+	var panel := PanelContainer.new()
+	panel.name = "Panel"
+	panel.position = Vector2(200, 80)
+	panel.size = Vector2(880, 520)
+	root.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.name = "VBox"
+	panel.add_child(vb)
+	var ill := TextureRect.new()
+	ill.name = "Illustration"
+	ill.custom_minimum_size = Vector2(840, 280)
+	ill.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ill.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	ill.visible = false
+	vb.add_child(ill)
+	var ph := ColorRect.new()
+	ph.name = "IllustrationPlaceholder"
+	ph.custom_minimum_size = Vector2(840, 200)
+	ph.color = Color(0.25, 0.35, 0.5)
+	ph.visible = false
+	vb.add_child(ph)
+	var ph_l := Label.new()
+	ph_l.name = "PathHint"
+	ph_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ph.add_child(ph_l)
+	var sp := Label.new()
+	sp.name = "Speaker"
+	sp.text = "阿莲"
+	vb.add_child(sp)
+	var tx := Label.new()
+	tx.name = "Text"
+	tx.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tx.custom_minimum_size = Vector2(800, 48)
+	vb.add_child(tx)
+	var hb := HBoxContainer.new()
+	hb.name = "HBox"
+	vb.add_child(hb)
+	var close_b := Button.new()
+	close_b.name = "CloseBtn"
+	close_b.text = "× 关闭"
+	hb.add_child(close_b)
+	var next_b := Button.new()
+	next_b.name = "NextBtn"
+	next_b.text = "下句"
+	hb.add_child(next_b)
+	root.set_script(load("res://scripts/ui/dialogue_box.gd"))
+	return root
+
+func _set_move_lock(reason: String, locked: bool) -> void:
+	if locked:
+		move_lock_reasons[reason] = true
+	else:
+		move_lock_reasons.erase(reason)
+	if player:
+		player.can_move = move_lock_reasons.is_empty()
+
+func _refresh_quest() -> void:
+	if quest_drawer and quest_drawer.has_method("refresh_from_state"):
+		quest_drawer.refresh_from_state()
+
+func _play_station_dialogue(lines: Array, closable: bool, on_done: Callable) -> void:
+	if dialogue == null or not dialogue.has_method("play"):
+		on_done.call()
+		return
+	_set_move_lock("dialogue", true)
+	for c in dialogue.finished.get_connections():
+		dialogue.finished.disconnect(c.callable)
+	for c in dialogue.closed.get_connections():
+		dialogue.closed.disconnect(c.callable)
+	var done_flag := {"v": false}
+	var finish := func():
+		if done_flag["v"]:
+			return
+		done_flag["v"] = true
+		_set_move_lock("dialogue", false)
+		on_done.call()
+	dialogue.finished.connect(finish, CONNECT_ONE_SHOT)
+	dialogue.closed.connect(finish, CONNECT_ONE_SHOT)
+	dialogue.play(lines, closable)
+
+func _play_intro_illustrated(replay: bool) -> void:
+	var lines := [
+		{"speaker": "旁白", "text": "莲花山南门开放日，人特别多。", "image": "res://assets/story/cg_intro_crowd.jpg"},
+		{"speaker": "阿莲", "text": "开放日人多，需要助手。", "image": "res://assets/story/cg_intro_crowd.jpg"},
+		{"speaker": "阿莲", "text": "先穿上这件橙马甲。", "image": "res://assets/story/cg_intro_crowd.jpg"},
+		{"speaker": "领队", "text": "别让孩子们在路口空等太久。", "image": "res://assets/story/cg_intro_crowd.jpg"},
+		{"speaker": "阿莲", "text": "等到什么时候停？说不清。", "image": "res://assets/story/cg_intro_crowd.jpg"},
+		{"speaker": "阿莲", "text": "先去引导台，把队伍排稳。", "image": "res://assets/story/cg_intro_crowd.jpg"},
+	]
+	_set_move_lock("dialogue", true)
+	if dialogue and dialogue.has_method("play"):
+		if replay and dialogue.has_method("mark_seen"):
+			dialogue.mark_seen()
+		for c in dialogue.finished.get_connections():
+			dialogue.finished.disconnect(c.callable)
+		for c in dialogue.closed.get_connections():
+			dialogue.closed.disconnect(c.callable)
+		var finish := func():
+			GameState.intro_seen = true
+			_set_move_lock("dialogue", false)
+			if not replay:
+				ClassroomBridge.report_evidence({
+					"eventType": "evidence_lock",
+					"schemaVersion": 1,
+					"taskId": "intro",
+					"evidenceCode": "E0",
+					"attemptKind": "process",
+					"correct": true,
+					"payload": {"capture": "in_world_action", "waitingStepId": "wait_green"},
+				})
+			_show_hub()
+		dialogue.finished.connect(finish, CONNECT_ONE_SHOT)
+		dialogue.closed.connect(finish, CONNECT_ONE_SHOT)
+		dialogue.play(lines, replay or GameState.intro_seen)
+	else:
+		_play_intro(replay)
 
 func _play_intro(is_replay: bool) -> void:
 	GameState.active_station = "intro"
@@ -727,16 +852,20 @@ func _play_intro(is_replay: bool) -> void:
 	player.can_move = false
 
 func _on_replay_req(payload: Dictionary) -> void:
-	_play_intro(true)
+	_play_intro_illustrated(true)
 
 func _show_hub() -> void:
 	GameState.active_station = "hub"
-	player.can_move = true
+	_set_move_lock("station", false)
+	_set_move_lock("dialogue", false)
+	_set_move_lock("learn", false)
+	player.can_move = move_lock_reasons.is_empty()
 	var next_id := _next_focus_id()
 	_set_task(_next_task_line(next_id))
 	GameState.set_focus(next_id)
 	_refresh_teleports()
 	_hide_stations()
+	_refresh_quest()
 
 func _hide_stations() -> void:
 	for st in [s1, s2a, s2b, s2c, s3]:
@@ -769,21 +898,29 @@ func _teleport(station: String, pos: Vector2) -> void:
 func _open_s1() -> void:
 	_hide_stations()
 	GameState.active_station = "s1"
-	_set_task("阿莲：把地贴步骤排对，再标出一直等的那步。")
-	# optional learn card short
-	s1.visible = true
-	if s1.has_method("open_station"):
-		s1.open_station()
-	_connect_station_once(s1, _on_s1_done, _show_hub)
+	_set_move_lock("station", true)
+	_set_task("阿莲：把『一直等』画成带回箭头的图。")
+	_play_station_dialogue([
+		{"speaker": "阿莲", "text": "开放日队伍乱了，有人要乱穿。", "image": "res://assets/story/cg_s1_queue.jpg"},
+		{"speaker": "阿莲", "text": "帮我把『一直等』画成带回箭头的图。", "image": "res://assets/story/cg_s1_queue.jpg"},
+	], false, func():
+		s1.visible = true
+		if s1.has_method("open_station"):
+			s1.open_station()
+		_connect_station_once(s1, _on_s1_done, _show_hub)
+		_refresh_quest()
+	)
 
 func _open_s2_flow() -> void:
-	# Learn card first
+	# E1 已在 S1；本站只做 E2+E3。先学卡 → S2-B 对比 → S2-C 壶
 	_hide_stations()
 	GameState.active_station = "s2_learn"
+	_set_move_lock("station", true)
 	var modal := learn_card
 	modal.visible = true
+	_set_move_lock("learn", true)
 	modal.get_node("VBox/Title").text = "先学卡·信号循环"
-	modal.get_node("VBox/Body").text = "阿莲：屏上那截『一直等』，得改成带回箭头的。\n①菱形问「还要不要再做」\n②回边＝条件成立再走一遍\n③次数可以事先不知道\n（不用「循环体」这个词）"
+	modal.get_node("VBox/Body").text = "阿莲：屏上那截『再等』，要分清循环和选路。\n①菱形问「还要不要再做」\n②回边＝条件成立再走一遍\n③次数可以事先不知道\n（不用「循环体」这个词）"
 	var close_b: Button = modal.get_node("VBox/HBox/CloseBtn")
 	var next_b: Button = modal.get_node("VBox/HBox/NextBtn")
 	next_b.text = "开始拆解"
@@ -791,47 +928,61 @@ func _open_s2_flow() -> void:
 		close_b.pressed.disconnect(c.callable)
 	for c in next_b.pressed.get_connections():
 		next_b.pressed.disconnect(c.callable)
-	close_b.pressed.connect(func(): modal.visible = false)
+	close_b.pressed.connect(func():
+		modal.visible = false
+		_set_move_lock("learn", false)
+	)
 	next_b.pressed.connect(func():
 		modal.visible = false
-		_open_s2a()
+		_set_move_lock("learn", false)
+		_play_station_dialogue([
+			{"speaker": "阿莲", "text": "信号屏说不清『再等』停在哪。", "image": "res://assets/story/cg_s2_panel.jpg"},
+			{"speaker": "阿莲", "text": "帮我分清再等还是选路。", "image": "res://assets/story/cg_s2_panel.jpg"},
+		], false, func(): _open_s2b())
 	)
+	_refresh_quest()
 
 func _open_s2a() -> void:
-	_hide_stations()
-	GameState.active_station = "s2a"
-	_set_task("阿莲：把『一直等』改成带回箭头的。")
-	s2a.visible = true
-	if s2a.has_method("open_station"):
-		s2a.open_station()
-	_connect_station_once(s2a, _on_s2a_done, _show_hub)
+	# E1 已迁到 S1；旧 S2-A 入口改为直接进对比屏
+	_open_s2b()
 
 func _open_s2b() -> void:
 	_hide_stations()
 	GameState.active_station = "s2b"
+	_set_move_lock("station", true)
 	_set_task("两张屏都有菱形。哪张在问还要不要再做？")
 	s2b.visible = true
 	if s2b.has_method("open_station"):
 		s2b.open_station()
 	_connect_station_once(s2b, _on_s2b_done, _show_hub)
+	_refresh_quest()
 
 func _open_s2c() -> void:
 	_hide_stations()
 	GameState.active_station = "s2c"
+	_set_move_lock("station", true)
 	_set_task("阿莲：休息点的壶也在反复加热，先标清楚。")
 	s2c.visible = true
 	if s2c.has_method("open_station"):
 		s2c.open_station()
 	_connect_station_once(s2c, _on_s2c_done, _show_hub)
+	_refresh_quest()
 
 func _open_s3() -> void:
 	_hide_stations()
 	GameState.active_station = "s3"
+	_set_move_lock("station", true)
 	_set_task("阿莲：先运行看堵，再换时长后重跑。")
-	s3.visible = true
-	if s3.has_method("open_station"):
-		s3.open_station()
-	_connect_station_once(s3, _on_s3_done, _show_hub)
+	_play_station_dialogue([
+		{"speaker": "阿莲", "text": "路口堵了，时长好像设错了。", "image": "res://assets/story/cg_s3_booth.jpg"},
+		{"speaker": "阿莲", "text": "先运行看堵，再改时长核对。", "image": "res://assets/story/cg_s3_booth.jpg"},
+	], false, func():
+		s3.visible = true
+		if s3.has_method("open_station"):
+			s3.open_station()
+		_connect_station_once(s3, _on_s3_done, _show_hub)
+		_refresh_quest()
+	)
 
 func _connect_station_once(st: Control, on_done: Callable, on_cancel: Callable) -> void:
 	if st.has_signal("completed"):
@@ -862,12 +1013,22 @@ func _envelope(task_id: String, data: Dictionary) -> Dictionary:
 	}
 
 func _on_s1_done(data: Dictionary) -> void:
+	# 主证据 E1 → taskId s2_rewrite；s1_order 仅可选附属不过问
+	GameState.set_station_done(GameState.TASK_S2A, true)
 	GameState.set_station_done(GameState.TASK_S1, true)
 	GameState.unlocked_relics["whistle"] = true
-	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S1, data))
-	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S2A, "unlocked": true})
-	_toast("阿莲：顺序有了。下一步把『一直等』说清楚。\n阿莲：这块哨给你，引导台先稳住了。")
-	_open_s2_flow()
+	var payload = data.duplicate(true)
+	if not payload.has("evidenceCode"):
+		payload["evidenceCode"] = "E1"
+	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2A, payload))
+	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S2B, "unlocked": true})
+	_play_station_dialogue([
+		{"speaker": "阿莲", "text": "接对了，行人按序走。", "image": "res://assets/story/cg_s1_flow_ok.jpg"},
+		{"speaker": "阿莲", "text": "这块哨给你，引导台稳住了。", "image": "res://assets/story/cg_s1_flow_ok.jpg"},
+	], true, func():
+		_set_move_lock("station", false)
+		_open_s2_flow()
+	)
 
 func _on_s2a_done(data: Dictionary) -> void:
 	GameState.set_station_done(GameState.TASK_S2A, true)
@@ -885,10 +1046,12 @@ func _on_s2c_done(data: Dictionary) -> void:
 	GameState.set_station_done(GameState.TASK_S2C, true)
 	GameState.unlocked_relics["arrow"] = true
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2C, data))
-	_toast("阿莲：反复说清了，也分清了『再等』和『选路』。\n阿莲：这枚箭头给你——再等，也能画清楚了。\n阿莲：调度亭那边还在堵。")
 	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S3, "unlocked": true})
+	_set_move_lock("station", false)
+	_toast("阿莲：反复说清了，也分清了『再等』和『选路』。\n阿莲：这枚箭头给你。调度亭那边还在堵。")
 	_show_hub()
 	GameState.set_focus("teleport_s3")
+	_refresh_quest()
 
 func _on_s3_done(data: Dictionary) -> void:
 	GameState.set_station_done(GameState.TASK_S3, true)
@@ -897,8 +1060,14 @@ func _on_s3_done(data: Dictionary) -> void:
 		GameState.s3_detail = data["s3Detail"]
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S3, data))
 	ClassroomBridge.emit_to_js("progress:s3Detail", GameState.s3_detail)
-	_toast("阿莲：时长设对了，路口顺多了。\n阿莲：三站稳住了。来当课小测。\n领队：顺多了，谢谢小助手。")
-	_on_exam_opened()
+	_set_move_lock("station", false)
+	_play_station_dialogue([
+		{"speaker": "阿莲", "text": "时长设对了，路口顺多了。", "image": "res://assets/story/cg_exam_ready.jpg"},
+		{"speaker": "阿莲", "text": "三站稳住了。可以去考核了。", "image": "res://assets/story/cg_exam_ready.jpg"},
+	], true, func():
+		_on_exam_opened()
+		_refresh_quest()
+	)
 
 func _on_exam_opened() -> void:
 	ClassroomBridge.open_exam()
@@ -919,10 +1088,14 @@ func _on_relic() -> void:
 func _relic_tip() -> String:
 	match GameState.active_station:
 		"s1":
-			return "法宝：先填下一个空地贴。步骤要有先后，才能看出哪步在等。"
+			if s1 and s1.has_method("highlight_for_relic"):
+				return "法宝：" + s1.highlight_for_relic()
+			return "法宝：把一直等改成：问还要不要再观察。点『是』拉回观察框。"
 		"s2a":
-			return "法宝：菱形要能答是/否；回边指回还在做的那步。"
+			return "法宝：看哪张有箭头绕回来——那才是『再做』。"
 		"s2b":
+			if s2b and s2b.has_method("highlight_for_relic"):
+				return "法宝：" + s2b.highlight_for_relic()
 			return "法宝：看哪张有箭头绕回来——那才是『再做』。"
 		"s2c":
 			return "法宝：先问：不够才加热。别用「循环体」说法。"
@@ -935,7 +1108,7 @@ func _relic_tip() -> String:
 			return "法宝：按任务单顺序，先去引导台。"
 
 func _reset_current() -> void:
-	var map := {"s1": GameState.TASK_S1, "s2a": GameState.TASK_S2A, "s2b": GameState.TASK_S2A, "s2c": GameState.TASK_S2A, "s3": GameState.TASK_S3}
+	var map := {"s1": GameState.TASK_S2A, "s2a": GameState.TASK_S2B, "s2b": GameState.TASK_S2B, "s2c": GameState.TASK_S2C, "s3": GameState.TASK_S3}
 	var tid: String = map.get(GameState.active_station, "")
 	if tid == "":
 		_toast("当前不在关卡内。")
@@ -952,7 +1125,7 @@ func _reset_current() -> void:
 func _next_focus_id() -> String:
 	if not GameState.intro_seen:
 		return "teleport_s1"
-	if not bool(GameState.stations.get(GameState.TASK_S1, false)):
+	if not bool(GameState.stations.get(GameState.TASK_S2A, false)):
 		return "teleport_s1"
 	var s2_done := bool(GameState.stations.get(GameState.TASK_S2A, false)) 		and bool(GameState.stations.get(GameState.TASK_S2B, false)) 		and bool(GameState.stations.get(GameState.TASK_S2C, false))
 	if not s2_done:
@@ -964,9 +1137,9 @@ func _next_focus_id() -> String:
 func _next_task_line(focus_id: String) -> String:
 	match focus_id:
 		"teleport_s1":
-			return "阿莲：先去引导台，把队伍排稳。"
+			return "阿莲：先去引导台，把『一直等』画成带回箭头的图。"
 		"teleport_s2":
-			return "阿莲：前往拆解台，把『一直等』说清楚。"
+			return "阿莲：前往拆解台，分清『再等』和『选路』。"
 		"teleport_s3":
 			return "阿莲：调度亭还在堵，去调时长。"
 		"exam":
@@ -1053,7 +1226,7 @@ func _smoke_playthrough() -> void:
 		s3._run()
 		s3._submit()
 		await get_tree().process_frame
-	var ok := bool(GameState.stations["s1_order"]) and bool(GameState.stations["s2_rewrite"]) and bool(GameState.stations["s2_vs_branch"]) and bool(GameState.stations["s2_kettle"]) and bool(GameState.stations["s3_timing"])
+	var ok := bool(GameState.stations["s2_rewrite"]) and bool(GameState.stations["s2_vs_branch"]) and bool(GameState.stations["s2_kettle"]) and bool(GameState.stations["s3_timing"])
 	print("[smoke] FINAL=", GameState.stations, " ok=", ok, " font=", UiTheme.ui_font != null)
 	get_tree().quit(0 if ok else 1)
 
