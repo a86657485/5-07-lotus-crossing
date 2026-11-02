@@ -920,7 +920,7 @@ func _open_s2_flow() -> void:
 	modal.visible = true
 	_set_move_lock("learn", true)
 	modal.get_node("VBox/Title").text = "先学卡·信号循环"
-	modal.get_node("VBox/Body").text = "阿莲：屏上那截『再等』，要分清循环和选路。\n①菱形问「还要不要再做」\n②回边＝条件成立再走一遍\n③次数可以事先不知道\n（不用「循环体」这个词）"
+	modal.get_node("VBox/Body").text = "阿莲：屏上那截『再等』，要分清循环和选路。\n①菱形问「还要不要再做」＝循环条件\n②回边＝条件成立再走一遍反复步骤\n③先问再做；次数可以事先不知道"
 	var close_b: Button = modal.get_node("VBox/HBox/CloseBtn")
 	var next_b: Button = modal.get_node("VBox/HBox/NextBtn")
 	next_b.text = "开始拆解"
@@ -1098,7 +1098,7 @@ func _relic_tip() -> String:
 				return "法宝：" + s2b.highlight_for_relic()
 			return "法宝：看哪张有箭头绕回来——那才是『再做』。"
 		"s2c":
-			return "法宝：先问：不够才加热。别用「循环体」说法。"
+			return "法宝：先问够不够：不够才加热，再检测——先问先做。"
 		"s3":
 			var g = GameState.gate_states.get(GameState.TASK_S3, "pre_missing")
 			if g == "pre_missing":

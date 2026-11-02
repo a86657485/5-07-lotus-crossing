@@ -30,7 +30,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if event.is_action_pressed("ui_cancel"):
-		if closable_from_start or _seen_once or _idx == 0:
+		# 首看不可 Esc 关；仅 closable_from_start（二刷／回放）或已看完一遍
+		if closable_from_start or _seen_once:
 			_on_close()
 			get_viewport().set_input_as_handled()
 
@@ -56,7 +57,11 @@ func _show_current() -> void:
 		text_label.text = t
 	_apply_image(str(line.get("image", "")))
 	if close_btn:
-		close_btn.visible = true
+		# 首看隐藏 ×；二刷／已看过才显示（对齐 main.gd modal Closable）
+		var can_close := closable_from_start or _seen_once
+		close_btn.visible = can_close
+		close_btn.disabled = not can_close
+		close_btn.text = "×" if can_close else ""
 	if next_btn:
 		next_btn.text = "下句" if _idx < _queue.size() - 1 else "好的"
 
@@ -89,6 +94,9 @@ func _on_next() -> void:
 	_show_current()
 
 func _on_close() -> void:
+	# 门禁：首看不可关；仅 closable_from_start 或 _seen_once
+	if not (closable_from_start or _seen_once):
+		return
 	visible = false
 	visibility_changed_for_move.emit(false)
 	closed.emit()

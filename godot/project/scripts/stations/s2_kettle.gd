@@ -1,5 +1,5 @@
 extends Control
-## S2-C 保温壶教材式小流程图（E3／s2_kettle）；禁「循环体」
+## S2-C 保温壶教材式小流程图（E3／s2_kettle）；学生可见禁术语
 
 signal completed(payload: Dictionary)
 signal cancelled
@@ -130,5 +130,5 @@ func _config() -> Dictionary:
 		},
 		"ok_feedback": "壶短循环：检测→不够加热→再检测…直到可倒水 ✓",
 		"bad_feedback": "壶空转或一直加热不判停。⌫ 重贴。",
-		"idle_feedback": "保温壶待命（禁用「循环体」说法）",
+		"idle_feedback": "保温壶待命（先问够不够，再决定要不要加热）",
 	}
