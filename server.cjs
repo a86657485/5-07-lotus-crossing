@@ -355,8 +355,10 @@ function createService(options = {}) {
 
   function sendFile(res, file, reqMethod) {
     const ext = path.extname(file);
+    const size = fs.statSync(file).size;
     res.writeHead(200, {
       'Content-Type': mime[ext] || 'application/octet-stream',
+      'Content-Length': size,
       'Cache-Control': file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=86400' : 'no-cache',
       'X-Content-Type-Options': 'nosniff',
     });
