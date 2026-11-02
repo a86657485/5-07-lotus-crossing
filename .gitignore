@@ -9,3 +9,10 @@ runtime/
 .aistudio/
 *.sqlite
 *.sqlite-*
+
+# Godot editor cache (keep project sources + export)
+godot/project/.godot/
+
+.playwright-cli/
+docs/screenshots/*.wav
+

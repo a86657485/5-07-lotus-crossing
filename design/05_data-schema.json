@@ -1,0 +1,394 @@
+{
+  "$comment": "g5l7 classroom data schema v1.2 | 2026-11-01 15:45 审查必修：解锁三态＋法宝锁3＋角色A＋xlsx分母＋/teacher免密；enterAIStudio=false",
+  "version": "1.2",
+  "lessonCode": "g5l7",
+  "shell": "莲花山智慧路口·临时小交警",
+  "basedOn": [
+    "01_目标证据与时间表.md",
+    "02_情境方案_莲花山小交警.md",
+    "03_分层考核题库.md",
+    "03_questions.json@2026-11-01-loop-v1.1",
+    "04_美术风格规格.md"
+  ],
+  "roster": {
+    "source": "五年级班级姓名名单.xlsx",
+    "sheet": "班级姓名名单",
+    "columns": [
+      "班级",
+      "姓名"
+    ],
+    "classes": [
+      "501",
+      "502",
+      "503",
+      "504"
+    ],
+    "collaborationHeadcount": {
+      "501": 52,
+      "502": 53,
+      "503": 54,
+      "504": 53,
+      "total": 212,
+      "note": "与 xlsx 实测分班不一致；分母推荐以导入名单为准"
+    },
+    "xlsxMeasuredAt": "2026-11-01",
+    "xlsxHeadcount": {
+      "501": 53,
+      "502": 53,
+      "503": 52,
+      "504": 54,
+      "total": 212
+    },
+    "studentIdPattern": "${classId}|${normalizedName}|${rosterIndex}",
+    "emptyNameForbidden": true,
+    "manualEntry": {
+      "allowed": true,
+      "requiresClassConfirm": true,
+      "rosterSource": "manual"
+    },
+    "denominatorSource": "xlsx",
+    "locked": true
+  },
+  "taskIds": {
+    "enum": [
+      "s1_order",
+      "s2_rewrite",
+      "s2_vs_branch",
+      "s2_kettle",
+      "s3_timing",
+      "exam"
+    ],
+    "optional": [
+      "e6_ac_optional"
+    ],
+    "source": "02 §12",
+    "unlockOrder": [
+      "s1_order",
+      "s2_rewrite",
+      "s2_vs_branch",
+      "s2_kettle",
+      "s3_timing",
+      "exam"
+    ],
+    "examOpenRule": "S1_ok && S2_ok && S3_ok",
+    "s2OkRule": "s2_rewrite && s2_vs_branch && s2_kettle"
+  },
+  "evidence": {
+    "E0": {
+      "station": "intro",
+      "countsTowardPass": false,
+      "attempt": "process"
+    },
+    "E1": {
+      "taskId": "s2_rewrite",
+      "station": "S2-A",
+      "maps": [
+        "D1",
+        "K2",
+        "G1"
+      ],
+      "firstLock": true,
+      "supportedSeparate": true
+    },
+    "E2": {
+      "taskId": "s2_vs_branch",
+      "station": "S2-B",
+      "maps": [
+        "D2",
+        "G1"
+      ]
+    },
+    "E3": {
+      "taskId": "s2_kettle",
+      "station": "S2-C",
+      "maps": [
+        "D3",
+        "K2"
+      ],
+      "forbiddenStudentTerms": [
+        "循环体"
+      ]
+    },
+    "E4": {
+      "taskId": "s3_timing",
+      "station": "S3",
+      "maps": [
+        "G2"
+      ],
+      "revision": "latest"
+    },
+    "E5": {
+      "taskId": "exam",
+      "maps": [
+        "G1",
+        "G2",
+        "K1",
+        "K2",
+        "D1",
+        "D2",
+        "D3"
+      ],
+      "passBasis": "base_first_only"
+    },
+    "E6": {
+      "taskId": "e6_ac_optional",
+      "countsTowardExamOpen": false
+    }
+  },
+  "attemptKind": [
+    "first",
+    "supported",
+    "latest",
+    "history"
+  ],
+  "attemptTag": [
+    "first",
+    "revise",
+    "scaffold_supported",
+    "independent_transfer"
+  ],
+  "relic": {
+    "quotaDefault": 3,
+    "configurable": true,
+    "refillOnStationChange": false,
+    "deductsScore": false,
+    "countsAsError": false,
+    "fragments": [
+      {
+        "id": "zebra_whistle",
+        "station": "s1_order"
+      },
+      {
+        "id": "backedge_arrow",
+        "station": "s2_rewrite"
+      },
+      {
+        "id": "timing_knob",
+        "station": "s3_timing"
+      }
+    ],
+    "optionalCosmetic": [
+      "kettle_sticker",
+      "compare_mirror"
+    ],
+    "quota": 3,
+    "locked": true,
+    "note": "已锁整课3；禁止实现读成可扩5"
+  },
+  "scaffold": {
+    "levels": [
+      {
+        "level": 1,
+        "label": "observe"
+      },
+      {
+        "level": 2,
+        "label": "idea"
+      },
+      {
+        "level": 3,
+        "label": "concrete"
+      }
+    ],
+    "givesDirectAnswer": false,
+    "eventType": "scaffold"
+  },
+  "exam": {
+    "questionsVersion": "2026-11-01-loop-v1.1",
+    "baseCount": 16,
+    "challengeCount": 6,
+    "passLine": 13,
+    "rewardLine": 13,
+    "objectiveMinimumCounts": {
+      "G1": 3,
+      "G2": 2
+    },
+    "challengePassLine": 4,
+    "challengeAffectsPass": false,
+    "clientFieldsBeforeSubmit": [
+      "id",
+      "tier",
+      "type",
+      "stem",
+      "prompt",
+      "options",
+      "cards",
+      "rows",
+      "interaction",
+      "diagramRef",
+      "platform",
+      "fixedBlocks",
+      "blockMeta"
+    ],
+    "serverOnlyFields": [
+      "answer",
+      "accept",
+      "analysis",
+      "misconceptionMap",
+      "goalIds",
+      "keyIds",
+      "difficultyIds",
+      "solo",
+      "literacy",
+      "teacherNote",
+      "antiMemoryNote",
+      "revisionNote"
+    ],
+    "autoOpenWhenStationsDone": true,
+    "teacherCanCloseByClass": true,
+    "noCrossLessonContinue": true
+  },
+  "rewardGame": {
+    "unlock": "same_as_pass_line",
+    "conceptEmbed": [
+      "backedge_wait",
+      "red_green_switch"
+    ],
+    "licensePlaceholder": "",
+    "sourcePlaceholder": "",
+    "creditsPlaceholder": ""
+  },
+  "dedupeKey": {
+    "formula": "sha256(studentId|runId|taskId|eventType|attemptKind|evidenceCodeOrQuestionId)"
+  },
+  "bridgeEvents": [
+    {
+      "name": "app:session",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "station:unlock",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "station:focus",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "flow:open",
+      "dir": "GD→JS"
+    },
+    {
+      "name": "flow:close",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "flow:result",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "evidence:report",
+      "dir": "GD→JS"
+    },
+    {
+      "name": "relic:use",
+      "dir": "bidirectional"
+    },
+    {
+      "name": "relic:sync",
+      "dir": "bidirectional"
+    },
+    {
+      "name": "scaffold:offer",
+      "dir": "GD→JS"
+    },
+    {
+      "name": "exam:pull",
+      "dir": "GD→JS"
+    },
+    {
+      "name": "exam:questions",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "exam:submit",
+      "dir": "GD→JS"
+    },
+    {
+      "name": "exam:open",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "exam:closed",
+      "dir": "JS→GD"
+    },
+    {
+      "name": "story:replay",
+      "dir": "bidirectional"
+    }
+  ],
+  "teacherDashboard": {
+    "path": "/teacher",
+    "password": "none",
+    "noLocalhostHardcode": true,
+    "hiddenFromStudentApp": true,
+    "topOverviewDenominatorFixed": true,
+    "missingRecordLabel": "尚无证据",
+    "missingRecordScore": null,
+    "csvColumns": [
+      "classId",
+      "studentName",
+      "studentId",
+      "isTest",
+      "runId",
+      "s1_ok",
+      "s2a_ok",
+      "s2b_ok",
+      "s2c_ok",
+      "s3_ok",
+      "e1_first",
+      "e2_first",
+      "e3_first",
+      "e4_latest",
+      "exam_base_first",
+      "exam_base_total",
+      "g1_first",
+      "g2_first",
+      "passed",
+      "challenge_score",
+      "challenge_bonus",
+      "relic_used",
+      "relic_quota",
+      "scaffold_max_level",
+      "reward_unlocked",
+      "first_login_at",
+      "last_event_at"
+    ],
+    "auth": "passwordless",
+    "locked": true
+  },
+  "timeboxMinutes": {
+    "intro": 2,
+    "s1": 4,
+    "s2": 10,
+    "s3": 3,
+    "examBase": 7,
+    "wrap": "1-2",
+    "total": "27-28",
+    "studentLearning": "25-30"
+  },
+  "artPlaceholder": {
+    "characterDefault": "A",
+    "pendingTeacherConfirm": true,
+    "locked": true
+  },
+  "deliveryBoundary": {
+    "writeFrontend": false,
+    "enterAIStudio": false,
+    "openPR": false,
+    "specOnly": true
+  },
+  "gateState": {
+    "enum": [
+      "pre_missing",
+      "pre_done_unverified",
+      "verified_ready"
+    ],
+    "s3HardRule": "faultObserved && (!ruleChanged || !revalidateOk) => forbid retry-fault copy",
+    "stationReset": {
+      "deductScore": false,
+      "restoreRelicQuota": false
+    }
+  },
+  "enterAIStudio": false
+}
