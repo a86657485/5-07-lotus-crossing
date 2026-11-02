@@ -763,12 +763,12 @@ func _play_station_dialogue(lines: Array, closable: bool, on_done: Callable) -> 
 
 func _play_intro_illustrated(replay: bool) -> void:
 	var lines := [
-		{"speaker": "旁白", "text": "莲花山南门开放日，人特别多。", "image": "res://assets/story/cg_intro_crowd.jpg"},
-		{"speaker": "阿莲", "text": "开放日人多，需要助手。", "image": "res://assets/story/cg_intro_crowd.jpg"},
-		{"speaker": "阿莲", "text": "先穿上这件橙马甲。", "image": "res://assets/story/cg_intro_crowd.jpg"},
-		{"speaker": "领队", "text": "别让孩子们在路口空等太久。", "image": "res://assets/story/cg_intro_crowd.jpg"},
-		{"speaker": "阿莲", "text": "等到什么时候停？说不清。", "image": "res://assets/story/cg_intro_crowd.jpg"},
-		{"speaker": "阿莲", "text": "先去引导台，把队伍排稳。", "image": "res://assets/story/cg_intro_crowd.jpg"},
+		{"speaker": "旁白", "text": "莲花山南门开放日，人特别多。", "image": "res://assets/story/cg_intro_crowd.png"},
+		{"speaker": "阿莲", "text": "开放日人多，需要助手。", "image": "res://assets/story/cg_intro_crowd.png"},
+		{"speaker": "阿莲", "text": "先穿上这件橙马甲。", "image": "res://assets/story/cg_intro_crowd.png"},
+		{"speaker": "领队", "text": "别让孩子们在路口空等太久。", "image": "res://assets/story/cg_intro_crowd.png"},
+		{"speaker": "阿莲", "text": "等到什么时候停？说不清。", "image": "res://assets/story/cg_intro_crowd.png"},
+		{"speaker": "阿莲", "text": "先去引导台，把队伍排稳。", "image": "res://assets/story/cg_intro_crowd.png"},
 	]
 	_set_move_lock("dialogue", true)
 	if dialogue and dialogue.has_method("play"):
@@ -901,8 +901,8 @@ func _open_s1() -> void:
 	_set_move_lock("station", true)
 	_set_task("阿莲：把『一直等』画成带回箭头的图。")
 	_play_station_dialogue([
-		{"speaker": "阿莲", "text": "开放日队伍乱了，有人要乱穿。", "image": "res://assets/story/cg_s1_queue.jpg"},
-		{"speaker": "阿莲", "text": "帮我把『一直等』画成带回箭头的图。", "image": "res://assets/story/cg_s1_queue.jpg"},
+		{"speaker": "阿莲", "text": "开放日队伍乱了，有人要乱穿。", "image": "res://assets/story/cg_s1_queue.png"},
+		{"speaker": "阿莲", "text": "帮我把『一直等』画成带回箭头的图。", "image": "res://assets/story/cg_s1_queue.png"},
 	], false, func():
 		s1.visible = true
 		if s1.has_method("open_station"):
@@ -936,8 +936,8 @@ func _open_s2_flow() -> void:
 		modal.visible = false
 		_set_move_lock("learn", false)
 		_play_station_dialogue([
-			{"speaker": "阿莲", "text": "信号屏说不清『再等』停在哪。", "image": "res://assets/story/cg_s2_panel.jpg"},
-			{"speaker": "阿莲", "text": "帮我分清再等还是选路。", "image": "res://assets/story/cg_s2_panel.jpg"},
+			{"speaker": "阿莲", "text": "信号屏说不清『再等』停在哪。", "image": "res://assets/story/cg_s2_panel.png"},
+			{"speaker": "阿莲", "text": "帮我分清再等还是选路。", "image": "res://assets/story/cg_s2_panel.png"},
 		], false, func(): _open_s2b())
 	)
 	_refresh_quest()
@@ -974,8 +974,8 @@ func _open_s3() -> void:
 	_set_move_lock("station", true)
 	_set_task("阿莲：先运行看堵，再换时长后重跑。")
 	_play_station_dialogue([
-		{"speaker": "阿莲", "text": "路口堵了，时长好像设错了。", "image": "res://assets/story/cg_s3_booth.jpg"},
-		{"speaker": "阿莲", "text": "先运行看堵，再改时长核对。", "image": "res://assets/story/cg_s3_booth.jpg"},
+		{"speaker": "阿莲", "text": "路口堵了，时长好像设错了。", "image": "res://assets/story/cg_s3_booth.png"},
+		{"speaker": "阿莲", "text": "先运行看堵，再改时长核对。", "image": "res://assets/story/cg_s3_booth.png"},
 	], false, func():
 		s3.visible = true
 		if s3.has_method("open_station"):
@@ -1023,8 +1023,8 @@ func _on_s1_done(data: Dictionary) -> void:
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2A, payload))
 	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S2B, "unlocked": true})
 	_play_station_dialogue([
-		{"speaker": "阿莲", "text": "接对了，行人按序走。", "image": "res://assets/story/cg_s1_flow_ok.jpg"},
-		{"speaker": "阿莲", "text": "这块哨给你，引导台稳住了。", "image": "res://assets/story/cg_s1_flow_ok.jpg"},
+		{"speaker": "阿莲", "text": "接对了，行人按序走。", "image": "res://assets/story/cg_s1_flow_ok.png"},
+		{"speaker": "阿莲", "text": "这块哨给你，引导台稳住了。", "image": "res://assets/story/cg_s1_flow_ok.png"},
 	], true, func():
 		_set_move_lock("station", false)
 		_open_s2_flow()
@@ -1062,8 +1062,8 @@ func _on_s3_done(data: Dictionary) -> void:
 	ClassroomBridge.emit_to_js("progress:s3Detail", GameState.s3_detail)
 	_set_move_lock("station", false)
 	_play_station_dialogue([
-		{"speaker": "阿莲", "text": "时长设对了，路口顺多了。", "image": "res://assets/story/cg_exam_ready.jpg"},
-		{"speaker": "阿莲", "text": "三站稳住了。可以去考核了。", "image": "res://assets/story/cg_exam_ready.jpg"},
+		{"speaker": "阿莲", "text": "时长设对了，路口顺多了。", "image": "res://assets/story/cg_exam_ready.png"},
+		{"speaker": "阿莲", "text": "三站稳住了。可以去考核了。", "image": "res://assets/story/cg_exam_ready.png"},
 	], true, func():
 		_on_exam_opened()
 		_refresh_quest()
