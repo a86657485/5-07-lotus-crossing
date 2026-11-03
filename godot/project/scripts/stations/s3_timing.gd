@@ -4,8 +4,8 @@ extends Control
 signal completed(payload: Dictionary)
 signal cancelled
 
-const STRATEGY_OK := "extend_green_car"
-const REASON_OK := "serve_junction"
+const STRATEGY_OK := "st_car_long"
+const REASON_OK := "rs_evacuate"
 
 var fault_observed: bool = false
 var strategy_id: String = ""
@@ -35,16 +35,18 @@ func open_station() -> void:
 	reason_id = ""
 	rule_changed = false
 	revalidate_ok = false
-	prompt.text = "阿莲：调度亭这边交给你。先运行，看哪边堵。\n领队：开放日车流还在涨，快点稳住。"
+	prompt.text = "①路口堵了，时长好像设错了。\n②帮阿莲调信号时长，让路口更顺。\n③换规则后再运行，看拥堵有没有缓解。\n（左侧循环示意只读；先运行≠布置）"
 	traffic_l.text = "车流条：尚未运行"
 	_update_gate()
 
 func _fill() -> void:
-	_btn(strat_row, "车多：加长该向绿灯", STRATEGY_OK, "strat")
-	_btn(strat_row, "全向同时加长(干扰)", "all_long", "strat")
-	_btn(reason_row, "小设置服务整条路口", REASON_OK, "reason")
-	_btn(reason_row, "因为叫「智慧」路口(干扰)", "smart_name", "reason")
-	_btn(reason_row, "随便设也行(干扰)", "random", "reason")
+	# 时长循环示意只读；主交互＝策略／理由卡＋运行（布置≠运行）
+	_btn(strat_row, "车多的方向：绿灯加长一点", STRATEGY_OK, "strat")
+	_btn(strat_row, "行人方向：绿灯加长", "st_ped_long", "strat")
+	_btn(strat_row, "所有方向都改成很短", "st_all_short", "strat")
+	_btn(reason_row, "小设置调对了，整条路口更顺", REASON_OK, "reason")
+	_btn(reason_row, "因为叫「智慧路口」所以随便改", "rs_smart_name", "reason")
+	_btn(reason_row, "数字好看就行", "rs_random", "reason")
 
 func _btn(parent: HBoxContainer, text: String, id: String, kind: String) -> void:
 	var b := Button.new()

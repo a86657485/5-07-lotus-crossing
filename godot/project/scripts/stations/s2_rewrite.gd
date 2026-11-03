@@ -1,128 +1,122 @@
 extends Control
-## S2-A 信号屏：拖菱形/矩形/回边 → 灯态回放
+## S1 主交互（E1／D1）：教材过马路循环图补菱形＋是回边／否前进
+## 主证据 taskId=s2_rewrite／evidenceCode=E1；禁止空位1–5
 
 signal completed(payload: Dictionary)
 signal cancelled
 
-const COND_OK := "cond_not_green"
-const REPEAT_OK := "repeat_observe"
-const BACK_OK := "back_to_repeat"
+const FlowBoardScr = preload("res://scripts/ui/flowchart_board.gd")
 
-var cond_id: String = ""
-var repeat_id: String = ""
-var back_id: String = ""
-var locked: bool = false
-var _history: Array = []
-
-@onready var prompt: Label = $Panel/VBox/Prompt
-@onready var light_l: Label = $Panel/VBox/LightReplay
-@onready var cond_box: HBoxContainer = $Panel/VBox/CondRow
-@onready var repeat_box: HBoxContainer = $Panel/VBox/RepeatRow
-@onready var back_box: HBoxContainer = $Panel/VBox/BackRow
-@onready var undo_btn: Button = $Panel/VBox/Tools/UndoBtn
-@onready var lock_btn: Button = $Panel/VBox/Tools/LockBtn
-@onready var back_btn: Button = $Panel/VBox/Tools/BackBtn
+var board: Control
 
 func _ready() -> void:
-	undo_btn.pressed.connect(_undo)
-	lock_btn.pressed.connect(_lock)
-	back_btn.pressed.connect(func(): cancelled.emit())
-	_fill_choices()
+	_ensure_board()
 
-func _unhandled_input(event: InputEvent) -> void:
-	if visible and event.is_action_pressed("undo_step"):
-		_undo()
-		get_viewport().set_input_as_handled()
+func _ensure_board() -> void:
+	if board != null:
+		return
+	var panel := get_node_or_null("Panel") as PanelContainer
+	if panel == null:
+		panel = PanelContainer.new()
+		panel.name = "Panel"
+		panel.position = Vector2(60, 36)
+		panel.size = Vector2(1160, 620)
+		add_child(panel)
+	for c in panel.get_children():
+		c.queue_free()
+	var host := Control.new()
+	host.name = "BoardHost"
+	host.custom_minimum_size = Vector2(1120, 580)
+	panel.add_child(host)
+	board = FlowBoardScr.new()
+	board.name = "FlowchartBoard"
+	board.set_anchors_preset(Control.PRESET_FULL_RECT)
+	host.add_child(board)
+	board.setup(_config())
+	board.submitted.connect(_on_submitted)
+	board.cancelled.connect(func(): cancelled.emit())
 
 func open_station() -> void:
 	visible = true
-	cond_id = ""
-	repeat_id = ""
-	back_id = ""
-	locked = false
-	_history.clear()
-	light_l.text = "灯柱待命（锁定后回放）"
-	_refresh_labels()
+	_ensure_board()
+	board.setup(_config())
+	board.open_board()
+	if board.prompt_label:
+		board.prompt_label.text = "①开放日队伍乱了，有人要乱穿。\n②帮阿莲把『一直等』画成带回箭头的图。\n③接对了，行人会按序走；灯会再闪再停。"
 
-func _fill_choices() -> void:
-	_add_choice(cond_box, "菱形：绿灯未亮？", COND_OK, "cond")
-	_add_choice(cond_box, "菱形：走天桥？(干扰)", "cond_bridge", "cond")
-	_add_choice(cond_box, "菱形：过马路(误放动作)", "cond_action", "cond")
-	_add_choice(repeat_box, "矩形：原地观察红绿灯", REPEAT_OK, "repeat")
-	_add_choice(repeat_box, "矩形：整段过街(干扰)", "repeat_all", "repeat")
-	_add_choice(back_box, "回边→反复观察", BACK_OK, "back")
-	_add_choice(back_box, "回边→过马路(干扰)", "back_cross", "back")
-	_add_choice(back_box, "回边反接(干扰)", "back_rev", "back")
+func highlight_for_relic() -> String:
+	_ensure_board()
+	return board.highlight_next()
 
-func _add_choice(parent: HBoxContainer, text: String, id: String, kind: String) -> void:
-	var b := Button.new()
-	b.text = text
-	b.pressed.connect(_pick.bind(kind, id, text))
-	parent.add_child(b)
-
-func _pick(kind: String, id: String, _text: String) -> void:
-	if locked:
-		return
-	_history.push_back({"kind": kind, "prev_cond": cond_id, "prev_repeat": repeat_id, "prev_back": back_id})
-	match kind:
-		"cond":
-			cond_id = id
-		"repeat":
-			repeat_id = id
-		"back":
-			back_id = id
-	_refresh_labels()
-
-func _undo() -> void:
-	if locked or _history.is_empty():
-		if locked:
-			locked = false
-			light_l.text = "已解锁修改，改后请重锁。"
-		return
-	var h: Dictionary = _history.pop_back()
-	cond_id = str(h.get("prev_cond", ""))
-	repeat_id = str(h.get("prev_repeat", ""))
-	back_id = str(h.get("prev_back", ""))
-	_refresh_labels()
-
-func _refresh_labels() -> void:
-	prompt.text = "阿莲：屏上那截『一直等』，得改成带回箭头的。\n把『观察并等待』改成带回箭头的图。"
-	# selection shown in light line pre-lock
-	if not locked:
-		light_l.text = "条件=%s｜反复=%s｜回边=%s（锁定前不对错）" % [cond_id, repeat_id, back_id]
-
-func _lock() -> void:
-	if cond_id == "" or repeat_id == "" or back_id == "":
-		light_l.text = "请先选齐菱形、矩形、回边。"
-		return
-	locked = true
-	var ok := cond_id == COND_OK and repeat_id == REPEAT_OK and back_id == BACK_OK
-	if ok:
-		light_l.text = "灯态回放：未亮→再观察闪烁一轮→亮了→走出循环过街 ✓"
-		var payload := {
-			"evidenceCode": "E1",
-			"attemptKind": "first" if int(GameState.fail_counts.get(GameState.TASK_S2A, 0)) == 0 else "revision",
-			"correct": true,
-			"payload": {
-				"capture": "in_world_action",
-				"conditionCardId": cond_id,
-				"repeatCardId": repeat_id,
-				"backEdgeTo": back_id,
-				"lightReplay": "loop_then_exit",
-			},
-		}
-		completed.emit(payload)
-	else:
+func _on_submitted(ok: bool, detail: Dictionary) -> void:
+	if not ok:
 		var n := GameState.bump_fail(GameState.TASK_S2A)
-		ClassroomBridge.request_scaffold(GameState.TASK_S2A, mini(n, 3), "M3")
-		light_l.text = "回放卡住／行人误走。⌫ 可改后重锁。\n" + _hint(n)
-		locked = false
+		ClassroomBridge.request_scaffold(GameState.TASK_S2A, mini(n, 3), "M2")
+		if board and board.feedback_label:
+			board.feedback_label.text = _hint(n)
+			board.feedback_label.modulate = Color(1.0, 0.55, 0.2)
+		return
+	completed.emit({
+		"evidenceCode": "E1",
+		"attemptKind": "first" if int(GameState.fail_counts.get(GameState.TASK_S2A, 0)) == 0 else "revision",
+		"correct": true,
+		"payload": {
+			"capture": "in_world_action",
+			"conditionCardId": detail.get("conditionCardId", "cond_green_off"),
+			"repeatCardId": "observe",
+			"backEdgeTo": detail.get("backEdgeTo", "observe"),
+			"noEdgeTo": detail.get("noEdgeTo", "cross"),
+			"lightReplay": detail.get("lightReplay", "loop_then_exit"),
+		},
+	})
 
 func _hint(n: int) -> String:
 	match n:
 		1:
-			return "菱形里要能答是或否。"
+			return "看看行人卡在哪；菱形里要能答是或否。"
 		2:
-			return "箭头该指回还在做的那步吗？"
+			return "『是』的箭头该指回还在做的那步吗？到达对面还要再做吗？"
 		_:
-			return "对照同结构示意图（换地名），不圈本题槽。"
+			return "对照换地名示意图：菱形问未亮？是→弯回观察；否→过马路。"
+
+func _config() -> Dictionary:
+	var nodes := [
+		{"id": "start", "kind": FlowBoardScr.NodeKind.START, "text": "到达十字路口", "pos": Vector2(360, 6), "size": Vector2(220, 40)},
+		{"id": "observe", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "原地观察红绿灯", "pos": Vector2(360, 70), "size": Vector2(220, 44)},
+		{"id": "decide", "kind": FlowBoardScr.NodeKind.DECISION, "text": "", "placeholder": "（填：绿灯未亮起？）", "pos": Vector2(340, 145), "size": Vector2(260, 72), "slot": true},
+		{"id": "cross", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "过马路", "pos": Vector2(360, 260), "size": Vector2(220, 44)},
+		{"id": "end", "kind": FlowBoardScr.NodeKind.END, "text": "到达马路对面", "pos": Vector2(360, 330), "size": Vector2(220, 40)},
+	]
+	return {
+		"mode": "fill",
+		"prompt": "把正确判断放进菱形；点『是』再点观察框；点『否』再点过马路。",
+		"submit_text": "锁定并回放",
+		"nodes": nodes,
+		"fixed_edges": [
+			{"from": "start", "to": "observe"},
+			{"from": "cross", "to": "end"},
+		],
+		"cards": [
+			{"id": "cond_green_off", "text": "绿灯未亮起？"},
+			{"id": "cond_bridge", "text": "有可用天桥？"},
+			{"id": "cond_count", "text": "已经等了三次？"},
+			{"id": "act_as_diamond", "text": "原地观察红绿灯"},
+			{"id": "cond_arrive", "text": "到达对面了吗？"},
+		],
+		"slot_order": ["decide", "wire:yes", "wire:no"],
+		"slot_tips": {
+			"decide": "点底部卡片「绿灯未亮起？」填入菱形空槽",
+			"wire:yes": "点菱形旁橙色『是』拉线柄，再点『原地观察红绿灯』",
+			"wire:no": "点菱形旁『否』拉线柄，再点『过马路』",
+		},
+		"expect": {
+			"slots": {"decide": "cond_green_off"},
+			"wires": {"yes": "observe", "no": "cross"},
+			"repeatCardId": "observe",
+		},
+		"ok_feedback": "灯再闪一轮观察→亮了→行人有序过马路 ✓",
+		"bad_feedback": "阿莲：看，有人挤出斑马线了！⌫ 撤回重锁",
+		"idle_feedback": "行人在路口等待流程图布置…",
+		"preview_ok": "结构接上了——锁定后看灯／行人回放。",
+		"relic_ready": "可以锁定了。法宝：把一直等改成『问还要不要再观察』。",
+	}

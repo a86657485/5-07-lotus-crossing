@@ -94,13 +94,22 @@ func reset_station(task_id: String) -> void:
 			stations[TASK_S1] = false
 			fail_counts[TASK_S1] = 0
 			set_gate(TASK_S1, "pre_missing")
-		TASK_S2A, TASK_S2B, TASK_S2C:
+		TASK_S2A:
+			# S1 主证据（E1）；不连带清 E2/E3
 			stations[TASK_S2A] = false
+			stations[TASK_S1] = false
+			fail_counts[TASK_S2A] = 0
+			fail_counts[TASK_S1] = 0
+			set_gate(TASK_S2A, "pre_missing")
+			set_gate(TASK_S1, "pre_missing")
+		TASK_S2B:
 			stations[TASK_S2B] = false
+			fail_counts[TASK_S2B] = 0
+			set_gate(TASK_S2B, "pre_missing")
+		TASK_S2C:
 			stations[TASK_S2C] = false
-			for t in [TASK_S2A, TASK_S2B, TASK_S2C]:
-				fail_counts[t] = 0
-				set_gate(t, "pre_missing")
+			fail_counts[TASK_S2C] = 0
+			set_gate(TASK_S2C, "pre_missing")
 		TASK_S3:
 			stations[TASK_S3] = false
 			fail_counts[TASK_S3] = 0
@@ -119,9 +128,11 @@ func s1_unlocked() -> bool:
 	return true
 
 func s2_unlocked() -> bool:
-	return bool(stations[TASK_S1])
+	# S1 主证据落在 s2_rewrite（E1）；s1_order 仅附属
+	return bool(stations[TASK_S2A]) or bool(stations[TASK_S1])
 
 func s3_unlocked() -> bool:
+	# S2 仅 E2+E3；E1 已在 S1 完成（TASK_S2A）
 	return bool(stations[TASK_S2A]) and bool(stations[TASK_S2B]) and bool(stations[TASK_S2C])
 
 func exam_ready() -> bool:
