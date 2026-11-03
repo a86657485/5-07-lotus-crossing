@@ -25,11 +25,13 @@ assert.ok(r1.details.find(d => d.questionId === 'B10').correct, 'B10 string shou
 const wrong = { ...asStrings, B04: '原地观察红绿灯', B05: '过马路', B10: '继续加热' };
 const r2 = evaluateAnswers(wrong);
 assert.strictEqual(r2.baseScore, 13, `expected 13/16 when B04/B05/B10 wrong, got ${r2.baseScore}`);
+
 assert.ok(!r2.details.find(d => d.questionId === 'B04').correct);
 assert.ok(!r2.details.find(d => d.questionId === 'B05').correct);
 assert.ok(!r2.details.find(d => d.questionId === 'B10').correct);
 
 // object-shaped submits still ok
+
 const asObjects = { ...asStrings, B04: { diamond: '绿灯未亮？' }, B05: { repeatRect: '原地观察红绿灯' }, B10: { condition: '水温还低于设定？' } };
 const r3 = evaluateAnswers(asObjects);
 assert.strictEqual(r3.baseScore, 16, `object-shaped drag_op should also score, got ${r3.baseScore}`);

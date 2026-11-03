@@ -30,6 +30,8 @@ export const ExamView: React.FC<ExamViewProps> = ({
 
   const currentQuestions = activeTier === 'base' ? baseQuestions : challengeQuestions;
   const currentQ = currentQuestions[currentQIndex] || currentQuestions[0];
+  // 挑战关：基础层达标后解锁（与结果条文案一致；不用易误读的锁 emoji）
+  const challengeUnlocked = !!(examSubmitted && examResult?.passed);
 
   const handleSelectOption = (qid: string, val: any) => {
     setAnswers(prev => ({ ...prev, [qid]: val }));
@@ -116,22 +118,24 @@ export const ExamView: React.FC<ExamViewProps> = ({
 
           <button
             type="button"
-            disabled={!examSubmitted}
+            disabled={!challengeUnlocked}
+            title={challengeUnlocked ? '基础层已达标，可进入挑战关' : '请先提交基础关并达标（≥13 且目标过半）'}
             onClick={() => {
-              if (examSubmitted) {
-                setActiveTier('challenge');
-                setCurrentQIndex(0);
-              }
+              if (!challengeUnlocked) return;
+              setActiveTier('challenge');
+              setCurrentQIndex(0);
             }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-              !examSubmitted
+              !challengeUnlocked
                 ? 'opacity-40 border-slate-800 bg-slate-800 text-slate-500 cursor-not-allowed'
                 : activeTier === 'challenge'
                 ? 'bg-purple-600 text-white border-purple-400 shadow-sm'
-                : 'bg-slate-800 text-purple-300 border-purple-500/40 hover:bg-slate-700'
+                : 'bg-slate-800 text-purple-200 border-purple-400 hover:bg-purple-900/40 ring-1 ring-purple-400/50'
             }`}
           >
-            {examSubmitted ? '挑战关（6 题加分）🔓' : '挑战关（交卷后解锁 🔒）'}
+            {challengeUnlocked
+              ? (activeTier === 'challenge' ? '挑战关（作答中 · 6 题）' : '挑战关 · 已解锁（点此进入）')
+              : '挑战关（达标后解锁）'}
           </button>
         </div>
       </div>
@@ -157,12 +161,26 @@ export const ExamView: React.FC<ExamViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                挑战关已解锁！完成挑战关可争取额外加分荣誉
+                {examResult.passed
+                  ? '挑战关已解锁：点右上「挑战关 · 已解锁」或下方按钮进入加分题。'
+                  : '尚未达标：可重做基础关；达标后才会解锁挑战关。'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {examResult.passed && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTier('challenge');
+                  setCurrentQIndex(0);
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow transition"
+              >
+                进入挑战关 →
+              </button>
+            )}
             {examResult.passed && onOpenRewardGame && (
               <button
                 type="button"
