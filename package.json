@@ -13,9 +13,10 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/utils/evaluation.test.ts",
+    "test": "tsx --test src/utils/evaluation.test.ts && node quiz.test.cjs",
     "server": "node --no-warnings server.cjs",
-    "start": "node --no-warnings server.cjs"
+    "start": "node --no-warnings server.cjs",
+    "quiz:test": "node quiz.test.cjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",

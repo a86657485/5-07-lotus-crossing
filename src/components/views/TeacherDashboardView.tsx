@@ -3,6 +3,17 @@ import { ClassId, StudentSessionRecord } from '../../types';
 import { CLASS_ROSTERS, TOTAL_STUDENTS_COUNT } from '../../data/roster';
 import { apiTeacher, teacherExportUrl, TeacherPayload } from '../../api/client';
 
+/** 固定名单分母下，1 人完成会被 Math.round 成 0%；完成人数>0 时至少显示 <1% 并带人数。 */
+function formatStationRate(count: number, total: number): { pctLabel: string; countLabel: string } {
+  if (total <= 0) return { pctLabel: '0%', countLabel: '0/0 人' };
+  const raw = (count / total) * 100;
+  let pctLabel: string;
+  if (count <= 0) pctLabel = '0%';
+  else if (raw < 1) pctLabel = '<1%';
+  else pctLabel = `${Math.round(raw)}%`;
+  return { pctLabel, countLabel: `${count}/${total} 人` };
+}
+
 interface TeacherDashboardViewProps {
   onBackToApp?: () => void;
 }
@@ -38,19 +49,9 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
     return () => window.clearInterval(timer);
   }, [refresh]);
 
-  const serverRowsById = useMemo(() => {
-    const map = new Map<string, NonNullable<TeacherPayload['students']>[number]>();
-    for (const row of payload?.students || []) {
-      map.set(row.student.studentId, row);
-    }
-    return map;
-  }, [payload]);
-
   const sessions = useMemo(() => {
     const map: Record<string, StudentSessionRecord> = {};
     for (const row of payload?.students || []) {
-      // 仅真实进课会话进入 sessions，避免花名册全员被当成「有会话」
-      if (!row.entered) continue;
       map[row.student.studentId] = {
         student: row.student,
         startedAt: row.lastSync || '',
@@ -85,28 +86,25 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
       byId.set(row.student.studentId, row.student);
     }
     return Array.from(byId.values()).map(student => {
-      const serverRow = serverRowsById.get(student.studentId);
       const session = sessions[student.studentId];
-      const stations = serverRow?.stations;
       return {
         student,
         session,
-        // 必须以服务端 entered 为准（payload 含全员花名册行，不能用 !!session）
-        isLoggedIn: !!serverRow?.entered,
-        s1Ok: !!stations?.s1_order,
-        s2Ok: !!(stations?.s2_rewrite && stations?.s2_vs_branch && stations?.s2_kettle),
-        s3Ok: !!stations?.s3_timing,
-        examScore: serverRow?.examResult?.baseScore ?? session?.examResult?.baseScore,
-        passed: serverRow?.examResult?.passed ?? session?.examResult?.passed ?? false,
-        g1Score: serverRow?.examResult?.g1Score ?? session?.examResult?.g1Score,
-        g2Score: serverRow?.examResult?.g2Score ?? session?.examResult?.g2Score,
-        challengeScore: serverRow?.examResult?.challengeScore ?? session?.examResult?.challengeScore,
-        challengeBonus: serverRow?.examResult?.challengePassed ?? session?.examResult?.challengePassed ?? false,
-        relicUsed: serverRow?.relics?.used ?? session?.relics.used ?? 0,
-        relicRemaining: serverRow?.relics?.remaining ?? session?.relics.remaining ?? 3,
+        isLoggedIn: !!session,
+        s1Ok: session?.stations.s1_order ?? false,
+        s2Ok: (session?.stations.s2_rewrite && session?.stations.s2_vs_branch && session?.stations.s2_kettle) ?? false,
+        s3Ok: session?.stations.s3_timing ?? false,
+        examScore: session?.examResult?.baseScore,
+        passed: session?.examResult?.passed ?? false,
+        g1Score: session?.examResult?.g1Score,
+        g2Score: session?.examResult?.g2Score,
+        challengeScore: session?.examResult?.challengeScore,
+        challengeBonus: session?.examResult?.challengePassed ?? false,
+        relicUsed: session?.relics.used ?? 0,
+        relicRemaining: session?.relics.remaining ?? 3,
       };
     });
-  }, [sessions, rosterStudents, payload, serverRowsById]);
+  }, [sessions, rosterStudents, payload]);
 
   const totalRosterCount = payload?.denominator
     ?? (selectedClass === 'all'
@@ -147,20 +145,37 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
     const relevant = selectedClass === 'all'
       ? mergedStudentRows
       : mergedStudentRows.filter(r => r.student.classId === selectedClass);
+    // Prefer row-derived counts so KPI 与名单 ✓ 同源；summary 作交叉校验兜底
+    const s1FromRows = relevant.filter(r => r.s1Ok).length;
+    const s2FromRows = relevant.filter(r => r.s2Ok).length;
+    const s3FromRows = relevant.filter(r => r.s3Ok).length;
+    const examFromRows = relevant.filter(r => r.passed).length;
     const loggedCount = payload?.summary.entered ?? relevant.filter(r => r.isLoggedIn).length;
-    const s1Count = payload?.summary.s1 ?? relevant.filter(r => r.s1Ok).length;
-    const s2Count = payload?.summary.s2 ?? relevant.filter(r => r.s2Ok).length;
-    const s3Count = payload?.summary.s3 ?? relevant.filter(r => r.s3Ok).length;
-    const examPassedCount = payload?.summary.examPassed ?? relevant.filter(r => r.passed).length;
+    const s1Count = Math.max(payload?.summary.s1 ?? 0, s1FromRows);
+    const s2Count = Math.max(payload?.summary.s2 ?? 0, s2FromRows);
+    const s3Count = Math.max(payload?.summary.s3 ?? 0, s3FromRows);
+    const examPassedCount = Math.max(payload?.summary.examPassed ?? 0, examFromRows);
     const challengeBonusCount = payload?.summary.challengeBonus ?? relevant.filter(r => r.challengeBonus).length;
     const totalRelicsUsed = payload?.summary.relicUsed ?? relevant.reduce((sum, r) => sum + r.relicUsed, 0);
+    const s1 = formatStationRate(s1Count, totalRosterCount);
+    const s2 = formatStationRate(s2Count, totalRosterCount);
+    const s3 = formatStationRate(s3Count, totalRosterCount);
+    const exam = formatStationRate(examPassedCount, totalRosterCount);
     return {
       loggedCount,
       totalCount: totalRosterCount,
-      s1Rate: totalRosterCount > 0 ? Math.round((s1Count / totalRosterCount) * 100) : 0,
-      s2Rate: totalRosterCount > 0 ? Math.round((s2Count / totalRosterCount) * 100) : 0,
-      s3Rate: totalRosterCount > 0 ? Math.round((s3Count / totalRosterCount) * 100) : 0,
-      passRate: totalRosterCount > 0 ? Math.round((examPassedCount / totalRosterCount) * 100) : 0,
+      s1Count,
+      s2Count,
+      s3Count,
+      examPassedCount,
+      s1Pct: s1.pctLabel,
+      s2Pct: s2.pctLabel,
+      s3Pct: s3.pctLabel,
+      examPct: exam.pctLabel,
+      s1Detail: s1.countLabel,
+      s2Detail: s2.countLabel,
+      s3Detail: s3.countLabel,
+      examDetail: exam.countLabel,
       challengeBonusCount,
       avgRelicUse: loggedCount > 0 ? (totalRelicsUsed / loggedCount).toFixed(1) : '0.0',
     };
@@ -242,34 +257,32 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
         {/* S1 Rate */}
         <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
           <div className="text-[11px] font-semibold text-slate-400">S1 过街引导完成率</div>
-          <div className="text-2xl font-black text-amber-400 mt-1">
-            {stats.s1Rate}%
-          </div>
+          <div className="text-2xl font-black text-amber-400 mt-1">{stats.s1Pct}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{stats.s1Detail}</div>
         </div>
 
         {/* S2 Rate */}
         <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
           <div className="text-[11px] font-semibold text-slate-400">S2 循环拆解完成率</div>
-          <div className="text-2xl font-black text-amber-400 mt-1">
-            {stats.s2Rate}%
-          </div>
+          <div className="text-2xl font-black text-amber-400 mt-1">{stats.s2Pct}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{stats.s2Detail}</div>
         </div>
 
         {/* S3 Rate */}
         <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
           <div className="text-[11px] font-semibold text-slate-400">S3 时长调度完成率</div>
-          <div className="text-2xl font-black text-amber-400 mt-1">
-            {stats.s3Rate}%
-          </div>
+          <div className="text-2xl font-black text-amber-400 mt-1">{stats.s3Pct}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{stats.s3Detail}</div>
         </div>
 
         {/* Exam pass rate */}
         <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
           <div className="text-[11px] font-semibold text-slate-400">基础考核达标率</div>
           <div className="text-2xl font-black text-emerald-400 mt-1">
-            {stats.passRate}%
+            {stats.examPct}
             <span className="text-[10px] text-slate-400 font-normal ml-1">(≥13题)</span>
           </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{stats.examDetail}</div>
         </div>
 
         {/* Relic average use */}

@@ -311,6 +311,22 @@ const BANK = {
   }
 };
 
+/** 点卡／单槽对象答（如 {diamond:"…"}）与前端字符串点选统一成可比较标量 */
+function answerScalar(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const vals = Object.values(value);
+    if (
+      vals.length === 1 &&
+      (typeof vals[0] === 'string' || typeof vals[0] === 'number' || typeof vals[0] === 'boolean')
+    ) {
+      return String(vals[0]).trim();
+    }
+    return null;
+  }
+  return String(value).trim();
+}
+
 function evaluateAnswers(answers) {
   const baseQs = BANK.questions.filter(q => q.tier === 'base');
   const challengeQs = BANK.questions.filter(q => q.tier === 'challenge');
@@ -329,7 +345,23 @@ function evaluateAnswers(answers) {
           isCorrect = keys.length > 0 && keys.every(k => userAnswer[k] === stdAnswer[k]);
         }
       } else {
-        isCorrect = String(userAnswer).trim() === String(stdAnswer).trim();
+        const u = answerScalar(userAnswer);
+        const s = answerScalar(stdAnswer);
+        if (u !== null && s !== null) {
+          isCorrect = u === s;
+        } else if (
+          typeof userAnswer === 'object' &&
+          typeof stdAnswer === 'object' &&
+          userAnswer &&
+          stdAnswer &&
+          !Array.isArray(userAnswer) &&
+          !Array.isArray(stdAnswer)
+        ) {
+          const keys = Object.keys(stdAnswer);
+          isCorrect = keys.length > 0 && keys.every(k => userAnswer[k] === stdAnswer[k]);
+        } else {
+          isCorrect = String(userAnswer).trim() === String(stdAnswer).trim();
+        }
       }
     }
     let misconceptionId;
@@ -369,4 +401,4 @@ function publicQuestions() {
   return BANK.questions.map(({ id, tier, type }) => ({ id, tier, type }));
 }
 
-module.exports = { BANK, evaluateAnswers, publicQuestions, QUIZ_VERSION: BANK.version };
+module.exports = { BANK, evaluateAnswers, answerScalar, publicQuestions, QUIZ_VERSION: BANK.version };

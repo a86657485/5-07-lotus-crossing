@@ -1,0 +1,47 @@
+{
+  "id": "g5l7-godot-art-pack-v1",
+  "version": "1.0",
+  "scheme": "A_Q_chibi_orange_vest",
+  "created": "2026-11-01 22:40 Asia/Shanghai",
+  "based_on": [
+    "04_GodotRPG美术补丁.md",
+    "04_美术风格规格.md"
+  ],
+  "godot_import": {
+    "player_sheet": "characters/player_4dir_sheet.png — 4 cells 96×96, order: down, left, right, up",
+    "alian": "characters/alian_{down,left,right}.png + alian_portrait.png",
+    "signal": "props/signal_{red,amber,green,off}.png or signal_4state_sheet.png cells 48×96",
+    "focus_ring": "fx/focus_ring.png under feet; pulse_0..2 for AnimationPlayer",
+    "tiles": "tiles/*_tile.png 64×64 TileSet",
+    "moodboard": "reference only, do not bake into gameplay UI text"
+  },
+  "files": [
+    "characters/alian_down.png",
+    "characters/alian_left.png",
+    "characters/alian_portrait.png",
+    "characters/alian_right.png",
+    "characters/captain_down.png",
+    "characters/player_4dir_sheet.png",
+    "characters/player_down.png",
+    "characters/player_left.png",
+    "characters/player_right.png",
+    "characters/player_up.png",
+    "fx/focus_ring.png",
+    "fx/focus_ring_pulse_0.png",
+    "fx/focus_ring_pulse_1.png",
+    "fx/focus_ring_pulse_2.png",
+    "moodboard/mood_01_intersection_overview.jpg",
+    "moodboard/mood_02_characters_focus.jpg",
+    "moodboard/mood_03_s2_light_flow.jpg",
+    "props/dispatch_booth.png",
+    "props/signal_4state_sheet.png",
+    "props/signal_amber.png",
+    "props/signal_green.png",
+    "props/signal_off.png",
+    "props/signal_red.png",
+    "props/thermos.png",
+    "tiles/asphalt_tile.png",
+    "tiles/curb_tile.png",
+    "tiles/zebra_tile.png"
+  ]
+}

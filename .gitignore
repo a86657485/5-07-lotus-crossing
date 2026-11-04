@@ -10,7 +10,9 @@ runtime/
 *.sqlite
 *.sqlite-*
 
-# Godot
+# Godot editor cache (keep project sources + export)
 godot/project/.godot/
-godot/project/.import/
-*.translation
+
+.playwright-cli/
+docs/screenshots/*.wav
+

@@ -351,14 +351,14 @@ function createService(options = {}) {
     '.woff2': 'font/woff2',
     '.json': 'application/json; charset=utf-8',
     '.map': 'application/json; charset=utf-8',
-    '.wasm': 'application/wasm',
-    '.pck': 'application/octet-stream',
   };
 
   function sendFile(res, file, reqMethod) {
     const ext = path.extname(file);
+    const size = fs.statSync(file).size;
     res.writeHead(200, {
       'Content-Type': mime[ext] || 'application/octet-stream',
+      'Content-Length': size,
       'Cache-Control': file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=86400' : 'no-cache',
       'X-Content-Type-Options': 'nosniff',
     });
@@ -473,9 +473,9 @@ function createService(options = {}) {
             used,
             remaining: RELIC_QUOTA - used,
             unlockedRelics: {
-              whistle: !!(body.relics.unlockedRelics?.whistle ?? state.relics?.unlockedRelics?.whistle),
-              arrow: !!(body.relics.unlockedRelics?.arrow ?? state.relics?.unlockedRelics?.arrow),
-              knob: !!(body.relics.unlockedRelics?.knob ?? state.relics?.unlockedRelics?.knob),
+              whistle: !!(body.relics.unlockedRelics?.whistle ?? state.relics.unlockedRelics.whistle),
+              arrow: !!(body.relics.unlockedRelics?.arrow ?? state.relics.unlockedRelics.arrow),
+              knob: !!(body.relics.unlockedRelics?.knob ?? state.relics.unlockedRelics.knob),
             },
           };
         }
@@ -553,7 +553,10 @@ function createService(options = {}) {
       const name = route.slice(1);
       if (!name || name.split('/').some((part) => part.startsWith('.') || !part)) fail(404, '文件不存在');
 
-      const tryDirs = [distDir, publicDir];
+      // godot/ 优先 public（重导 HTML5 包），避免 dist 旧包抢先；其余静态仍 dist→public
+      const tryDirs = name === 'godot' || name.startsWith('godot/')
+        ? [publicDir, distDir]
+        : [distDir, publicDir];
       for (const root of tryDirs) {
         const file = path.join(root, name);
         if (
