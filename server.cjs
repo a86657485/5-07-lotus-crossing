@@ -16,6 +16,44 @@ const CLASSES = ['501', '502', '503', '504'];
 const APP_ID = 'lotus-crossing-5-07';
 const RELIC_QUOTA = 3;
 const DEFAULT_PORT = 8797;
+const STATION_KEYS = Object.keys(emptyStations());
+const EVIDENCE_TASKS = new Set([...STATION_KEYS, 'intro', 'intro_e0', 'e6_ac_optional']);
+
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function eventIdFor(value) {
+  if (value === undefined) return crypto.randomUUID();
+  if (typeof value !== 'string' || !value.trim() || value.length > 160) fail(400, '事件标识格式不正确');
+  return value;
+}
+
+function hasChallengeAnswers(answers) {
+  return Object.entries(answers || {}).some(([id, value]) => /^C0[1-6]$/.test(id) && value !== null && value !== '');
+}
+
+function combinedFirstResult(base, challenge) {
+  if (!base) return null;
+  return {
+    ...base,
+    challengeScore: challenge?.challengeScore || 0,
+    challengePassed: !!challenge?.challengePassed,
+    details: [
+      ...base.details.filter((row) => row.tier === 'base'),
+      ...(challenge?.details.filter((row) => row.tier === 'challenge') || []),
+    ],
+  };
+}
+
+function clientPayload(payload) {
+  const result = payload.result ? { ...payload.result, details: [] } : undefined;
+  const state = { ...payload.state };
+  for (const key of ['examResult', 'examFirstResult', 'challengeFirstResult', 'examLatestResult']) {
+    if (state[key]) state[key] = { ...state[key], details: [] };
+  }
+  return { ...payload, state, ...(result ? { result } : {}) };
+}
 
 function fail(status, message, code) {
   throw Object.assign(new Error(message), { status, code });
@@ -79,6 +117,11 @@ function initialState(student) {
     relics: emptyRelics(),
     scaffoldHistory: [],
     examResult: null,
+    examFirstResult: null,
+    challengeFirstResult: null,
+    examLatestResult: null,
+    examFirstAnswers: null,
+    challengeFirstAnswers: null,
     examAnswers: null,
     rewardUnlocked: false,
     examOpen: false,
@@ -113,7 +156,9 @@ function createService(options = {}) {
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;
     CREATE TABLE IF NOT EXISTS students(id TEXT PRIMARY KEY, classId TEXT NOT NULL, name TEXT NOT NULL, manual INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS states(studentId TEXT PRIMARY KEY, json TEXT NOT NULL, lastSync TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS events(studentId TEXT NOT NULL, eventId TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(studentId, eventId));`);
+    CREATE TABLE IF NOT EXISTS events(studentId TEXT NOT NULL, eventId TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(studentId, eventId));
+    CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, studentId TEXT NOT NULL, createdAt TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS evidence(studentId TEXT NOT NULL, eventId TEXT NOT NULL, json TEXT NOT NULL, createdAt TEXT NOT NULL, PRIMARY KEY(studentId, eventId));`);
 
   const rosterIds = new Set();
   const insertStudent = db.prepare(
@@ -158,14 +203,44 @@ function createService(options = {}) {
   function recordFor(id) {
     const row = db.prepare('SELECT * FROM states WHERE studentId=?').get(id);
     if (!row) return { state: null, lastSync: null, entered: false };
-    return { state: JSON.parse(row.json), lastSync: row.lastSync, entered: true };
+    const state = { ...initialState(null), ...JSON.parse(row.json) };
+    // The old service overwrote state results; recover first attempts from its append-only history.
+    if (state.examResult && !state.examFirstResult) {
+      const history = db.prepare('SELECT result FROM events WHERE studentId=? ORDER BY rowid').all(id)
+        .map((event) => JSON.parse(event.result));
+      const first = history[0];
+      state.examFirstResult = first?.result || state.examResult;
+      state.examFirstAnswers = first?.state?.examAnswers || state.examAnswers;
+      state.examLatestResult = state.examResult;
+      const challenge = history.find((event) => event.tier === 'challenge' || hasChallengeAnswers(event.state?.examAnswers));
+      if (challenge || hasChallengeAnswers(state.examAnswers)) {
+        state.challengeFirstResult = challenge?.result || state.examResult;
+        state.challengeFirstAnswers = challenge?.state?.examAnswers || state.examAnswers;
+      }
+    }
+    deriveState(state);
+    return { state, lastSync: row.lastSync, entered: true };
+  }
+
+  function deriveState(state) {
+    if (!state.s3Detail?.ruleChanged || !state.s3Detail?.revalidateOk) state.stations.s3_timing = false;
+    const ok = stationsOk(state.stations);
+    const used = Math.max(0, Math.min(RELIC_QUOTA, Number(state.relics?.used) || 0));
+    state.relics = {
+      quota: RELIC_QUOTA,
+      used,
+      remaining: RELIC_QUOTA - used,
+      unlockedRelics: { whistle: ok.s1, arrow: ok.s2, knob: ok.s3 },
+    };
+    state.examResult = combinedFirstResult(state.examFirstResult, state.challengeFirstResult);
+    state.rewardUnlocked = !!state.examResult?.passed;
+    state.examOpen = ok.all;
   }
 
   function save(id, state) {
     state.lastActiveAt = now();
     if (!state.startedAt) state.startedAt = state.lastActiveAt;
-    const ok = stationsOk(state.stations);
-    state.examOpen = ok.all || !!state.examResult;
+    deriveState(state);
     db.prepare(
       'INSERT INTO states VALUES(?,?,?) ON CONFLICT(studentId) DO UPDATE SET json=excluded.json,lastSync=excluded.lastSync'
     ).run(id, JSON.stringify(state), state.lastActiveAt);
@@ -208,6 +283,46 @@ function createService(options = {}) {
     checkOrigin(req);
   }
 
+  function studentGuard(req, studentId) {
+    const match = /^Bearer ([a-f0-9]{64})$/.exec(req.headers.authorization || '');
+    if (!match) fail(401, '请先登录本课堂');
+    const session = db.prepare('SELECT studentId FROM sessions WHERE token=?').get(match[1]);
+    if (!session) fail(401, '登录状态无效，请重新登录');
+    if (session.studentId !== studentId) fail(403, '不能读取或修改其他同学的课堂记录');
+    const student = studentById(studentId);
+    if (!student) fail(401, '学生身份不存在，请重新登录');
+    return student;
+  }
+
+  function evidenceFor(studentId) {
+    return db.prepare('SELECT json FROM evidence WHERE studentId=? ORDER BY rowid').all(studentId)
+      .map((row) => JSON.parse(row.json));
+  }
+
+  function validateEvidence(value, student) {
+    if (!isObject(value) || !EVIDENCE_TASKS.has(value.taskId) || typeof value.correct !== 'boolean') {
+      fail(400, '探究证据格式不正确');
+    }
+    if (value.payload !== undefined && !isObject(value.payload)) fail(400, '证据内容格式不正确');
+    if (value.studentId && value.studentId !== student.id) fail(403, '证据与当前学生身份不一致');
+    if (Buffer.byteLength(JSON.stringify(value)) > 32 * 1024) fail(413, '单次证据内容过大');
+    return { ...value, studentId: student.id, classId: student.classId,
+      runId: typeof value.runId === 'string' && value.runId.trim() ? value.runId : student.id,
+      eventId: eventIdFor(value.eventId), receivedAt: now() };
+  }
+
+  function transaction(work) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = work();
+      db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   function teacherData(classId) {
     if (classId && !CLASSES.includes(classId)) fail(400, '请选择五年级班级');
     const students = allStudents()
@@ -222,27 +337,30 @@ function createService(options = {}) {
           stations: state?.stations || emptyStations(),
           relics: state?.relics || emptyRelics(),
           examResult: state?.examResult || null,
+          examFirstResult: state?.examFirstResult || null,
+          challengeFirstResult: state?.challengeFirstResult || null,
+          examLatestResult: state?.examLatestResult || null,
+          examFirstAnswers: state?.examFirstAnswers || null,
+          challengeFirstAnswers: state?.challengeFirstAnswers || null,
+          examAnswers: state?.examAnswers || null,
           rewardUnlocked: !!state?.rewardUnlocked,
           examOpen: !!state?.examOpen,
           s3Detail: state?.s3Detail || emptyS3(),
+          evidence: evidenceFor(student.id),
         };
       });
 
-    const rosterTotal = classId
-      ? allStudents().filter((s) => s.classId === classId && !s.manual).length ||
-        classes().find((c) => c.id === classId)?.students.length ||
-        0
-      : rosterIds.size;
-
-    const entered = students.filter((s) => s.entered).length;
-    const s1 = students.filter((s) => s.stations.s1_order).length;
-    const s2 = students.filter(
+    const rosterStudents = students.filter((row) => rosterIds.has(row.student.studentId));
+    const rosterTotal = rosterStudents.length;
+    const entered = rosterStudents.filter((s) => s.entered).length;
+    const s1 = rosterStudents.filter((s) => s.stations.s1_order).length;
+    const s2 = rosterStudents.filter(
       (s) => s.stations.s2_rewrite && s.stations.s2_vs_branch && s.stations.s2_kettle
     ).length;
-    const s3 = students.filter((s) => s.stations.s3_timing).length;
-    const passed = students.filter((s) => s.examResult?.passed).length;
-    const challengeBonus = students.filter((s) => s.examResult?.challengePassed).length;
-    const relicUsed = students.reduce((sum, s) => sum + (s.relics?.used || 0), 0);
+    const s3 = rosterStudents.filter((s) => s.stations.s3_timing).length;
+    const passed = rosterStudents.filter((s) => s.examResult?.passed).length;
+    const challengeBonus = rosterStudents.filter((s) => s.examResult?.challengePassed).length;
+    const relicUsed = rosterStudents.reduce((sum, s) => sum + (s.relics?.used || 0), 0);
 
     return {
       appId: APP_ID,
@@ -250,7 +368,7 @@ function createService(options = {}) {
       updatedAt: now(),
       denominator: rosterTotal,
       classCounts: Object.fromEntries(
-        CLASSES.map((id) => [id, allStudents().filter((s) => s.classId === id && !s.manual).length])
+        CLASSES.map((id) => [id, allStudents().filter((s) => s.classId === id && rosterIds.has(s.id)).length])
       ),
       classes: classes(),
       students,
@@ -286,14 +404,19 @@ function createService(options = {}) {
       '挑战加分',
       '法宝已用(/3)',
     ];
-    const lines = [headers.join(',')];
+    const cell = (value) => {
+      let text = String(value ?? '');
+      if (/^[\s]*[=+\-@]/.test(text)) text = "'" + text;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const lines = [headers.map(cell).join(',')];
     for (const row of data.students) {
       const s2ok = row.stations.s2_rewrite && row.stations.s2_vs_branch && row.stations.s2_kettle;
       lines.push(
         [
           row.student.classId,
-          `"${row.student.name}"`,
-          `"${row.student.studentId}"`,
+          row.student.name,
+          row.student.studentId,
           row.entered ? '是' : '否',
           row.stations.s1_order ? '是' : '否',
           s2ok ? '是' : '否',
@@ -305,7 +428,7 @@ function createService(options = {}) {
           row.examResult?.challengeScore ?? '',
           row.examResult?.challengePassed ? '是' : row.examResult ? '否' : '',
           row.relics?.used ?? 0,
-        ].join(',')
+        ].map(cell).join(',')
       );
     }
     return lines.join('\n');
@@ -351,6 +474,7 @@ function createService(options = {}) {
     '.woff2': 'font/woff2',
     '.json': 'application/json; charset=utf-8',
     '.map': 'application/json; charset=utf-8',
+    '.wasm': 'application/wasm',
   };
 
   function sendFile(res, file, reqMethod) {
@@ -398,11 +522,10 @@ function createService(options = {}) {
       }
 
       if (req.method === 'GET' && route === '/api/state') {
-        const student = studentById(url.searchParams.get('studentId'));
-        if (!student) fail(404, '学生身份不存在');
+        const student = studentGuard(req, url.searchParams.get('studentId'));
         const record = recordFor(student.id);
         const state = record.state || initialState(toClientStudent(student));
-        return json(res, 200, { student: toClientStudent(student), state });
+        return json(res, 200, clientPayload({ student: toClientStudent(student), state }));
       }
 
       if (req.method === 'GET' && route === '/api/teacher') {
@@ -450,49 +573,50 @@ function createService(options = {}) {
         }
         state.student = toClientStudent(student);
         state = save(student.id, state);
-        return json(res, 200, { student: toClientStudent(student), state });
+        const sessionToken = crypto.randomBytes(32).toString('hex');
+        db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(sessionToken, student.id, now());
+        return json(res, 200, clientPayload({ student: toClientStudent(student), state, sessionToken }));
       }
 
       if (req.method === 'POST' && route === '/api/progress') {
         const body = await readBody(req);
-        const student = studentById(body.studentId);
-        if (!student) fail(400, '请先选择班级与姓名');
+        const student = studentGuard(req, body.studentId);
         const record = recordFor(student.id);
         const state = record.state || initialState(toClientStudent(student));
-        if (body.stations && typeof body.stations === 'object') {
-          state.stations = { ...state.stations, ...body.stations };
+        if (body.stations !== undefined) {
+          if (!isObject(body.stations) || Object.entries(body.stations).some(
+            ([key, value]) => !STATION_KEYS.includes(key) || typeof value !== 'boolean'
+          )) fail(400, '探究站状态格式不正确');
+          for (const [key, value] of Object.entries(body.stations)) {
+            if (key !== 'exam') state.stations[key] = value;
+          }
         }
-        if (body.s3Detail && typeof body.s3Detail === 'object') {
+        if (body.s3Detail !== undefined) {
+          if (!isObject(body.s3Detail)) fail(400, '时长调度状态格式不正确');
+          for (const [key, value] of Object.entries(body.s3Detail)) {
+            if (!Object.hasOwn(emptyS3(), key) || typeof value !== typeof emptyS3()[key]) fail(400, '时长调度状态格式不正确');
+          }
+          const changed = ['scenario', 'strategy', 'reason'].some(
+            (key) => body.s3Detail[key] !== undefined && body.s3Detail[key] !== state.s3Detail[key]
+          );
           state.s3Detail = { ...state.s3Detail, ...body.s3Detail };
-        }
-        if (body.relics && typeof body.relics === 'object') {
-          // clamp relic fields; quota locked to 3
-          const used = Math.max(0, Math.min(RELIC_QUOTA, Number(body.relics.used) || 0));
-          state.relics = {
-            quota: RELIC_QUOTA,
-            used,
-            remaining: RELIC_QUOTA - used,
-            unlockedRelics: {
-              whistle: !!(body.relics.unlockedRelics?.whistle ?? state.relics.unlockedRelics.whistle),
-              arrow: !!(body.relics.unlockedRelics?.arrow ?? state.relics.unlockedRelics.arrow),
-              knob: !!(body.relics.unlockedRelics?.knob ?? state.relics.unlockedRelics.knob),
-            },
-          };
+          if (changed && body.s3Detail.revalidateOk !== true) state.s3Detail.revalidateOk = false;
         }
         if (Array.isArray(body.scaffoldHistory)) {
           state.scaffoldHistory = body.scaffoldHistory.slice(-50);
         }
-        if (typeof body.rewardUnlocked === 'boolean') {
-          state.rewardUnlocked = body.rewardUnlocked || !!state.examResult?.passed;
-        }
-        const saved = save(student.id, state);
-        return json(res, 200, { student: toClientStudent(student), state: saved });
+        const evidence = body.evidence === undefined ? null : validateEvidence(body.evidence, student);
+        const saved = transaction(() => {
+          if (evidence) db.prepare('INSERT OR IGNORE INTO evidence VALUES(?,?,?,?)')
+            .run(student.id, evidence.eventId, JSON.stringify(evidence), evidence.receivedAt);
+          return save(student.id, state);
+        });
+        return json(res, 200, clientPayload({ student: toClientStudent(student), state: saved }));
       }
 
       if (req.method === 'POST' && route === '/api/relic') {
         const body = await readBody(req);
-        const student = studentById(body.studentId);
-        if (!student) fail(400, '请先选择班级与姓名');
+        const student = studentGuard(req, body.studentId);
         const record = recordFor(student.id);
         const state = record.state || initialState(toClientStudent(student));
         if (state.relics.remaining <= 0) fail(409, '通关法宝次数已用完');
@@ -500,39 +624,43 @@ function createService(options = {}) {
         state.relics.remaining = Math.max(0, RELIC_QUOTA - state.relics.used);
         state.relics.quota = RELIC_QUOTA;
         const saved = save(student.id, state);
-        return json(res, 200, { student: toClientStudent(student), state: saved, relics: saved.relics });
+        return json(res, 200, clientPayload({ student: toClientStudent(student), state: saved, relics: saved.relics }));
       }
 
       if (req.method === 'POST' && route === '/api/exam/submit') {
         const body = await readBody(req);
-        const student = studentById(body.studentId);
-        if (!student) fail(400, '请先选择班级与姓名');
-        const eventId = typeof body.eventId === 'string' && body.eventId ? body.eventId : crypto.randomUUID();
-        const previous = db.prepare('SELECT result FROM events WHERE studentId=? AND eventId=?').get(student.id, eventId);
-        if (previous) {
-          return json(res, 200, JSON.parse(previous.result));
-        }
+        const student = studentGuard(req, body.studentId);
+        const eventId = eventIdFor(body.eventId);
+        if (body.tier !== undefined && !['base', 'challenge'].includes(body.tier)) fail(400, '考核层级格式不正确');
         const record = recordFor(student.id);
         const state = record.state || initialState(toClientStudent(student));
         const ok = stationsOk(state.stations);
-        if (!ok.all && !state.examResult) fail(409, '请先完成三个探究站后再开考');
-        if (!body.answers || typeof body.answers !== 'object') fail(400, '作答格式不正确');
+        if (!ok.all) fail(409, '请先完成三个探究站后再开考');
+        const previous = db.prepare('SELECT result FROM events WHERE studentId=? AND eventId=?').get(student.id, eventId);
+        if (previous) return json(res, 200, clientPayload(JSON.parse(previous.result)));
+        if (!isObject(body.answers)) fail(400, '作答格式不正确');
+        if (body.tier === 'challenge' && !state.examFirstResult) fail(409, '请先提交基础考核后再做挑战题');
+        const challengeSubmitted = body.tier === 'challenge' || (body.tier === undefined && hasChallengeAnswers(body.answers));
         const result = evaluateAnswers(body.answers);
-        // Persist first attempt answers; later submits update latest but keep first pass flag if already passed
-        if (!state.examResult) {
-          state.examAnswers = body.answers;
-          state.examResult = result;
-        } else {
-          state.examAnswers = body.answers;
-          state.examResult = result;
+        if (!state.examFirstResult) {
+          state.examFirstAnswers = body.answers;
+          state.examFirstResult = result;
         }
+        if (!state.challengeFirstResult && challengeSubmitted) {
+          state.challengeFirstAnswers = body.answers;
+          state.challengeFirstResult = result;
+        }
+        state.examAnswers = body.answers;
+        state.examLatestResult = result;
         state.stations.exam = true;
-        state.rewardUnlocked = !!result.passed;
-        state.examOpen = true;
-        const saved = save(student.id, state);
-        const payload = { student: toClientStudent(student), state: saved, result };
-        db.prepare('INSERT INTO events VALUES(?,?,?)').run(student.id, eventId, JSON.stringify(payload));
-        return json(res, 200, payload);
+        const payload = transaction(() => {
+          const saved = save(student.id, state);
+          const value = { student: toClientStudent(student), state: saved, result: saved.examResult, eventId,
+            tier: body.tier || (challengeSubmitted ? 'challenge' : 'base') };
+          db.prepare('INSERT INTO events VALUES(?,?,?)').run(student.id, eventId, JSON.stringify(value));
+          return value;
+        });
+        return json(res, 200, clientPayload(payload));
       }
 
       if (route.startsWith('/api/')) fail(404, '接口不存在');
@@ -552,6 +680,7 @@ function createService(options = {}) {
 
       const name = route.slice(1);
       if (!name || name.split('/').some((part) => part.startsWith('.') || !part)) fail(404, '文件不存在');
+      if (/\.(?:md|cjs|ts|tsx|sqlite|jsonl)$/i.test(name)) fail(404, '文件不存在');
 
       // godot/ 优先 public（重导 HTML5 包），避免 dist 旧包抢先；其余静态仍 dist→public
       const tryDirs = name === 'godot' || name.startsWith('godot/')

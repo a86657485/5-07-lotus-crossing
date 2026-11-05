@@ -2,8 +2,13 @@ import React, { useState } from 'react';
 import { StationModalThreeQuestions } from '../common/StationModalThreeQuestions';
 import { ScaffoldDialog } from '../common/ScaffoldDialog';
 
+export interface Station1Evidence {
+  stepsOrder: string[];
+  waitingStepId: string | null;
+}
+
 interface Station1CrosswalkViewProps {
-  onComplete: () => void;
+  onComplete: (evidence: Station1Evidence) => void;
   onBackToMap: () => void;
 }
 
@@ -275,7 +280,7 @@ export const Station1CrosswalkView: React.FC<Station1CrosswalkViewProps> = ({
             </p>
             <button
               type="button"
-              onClick={onComplete}
+              onClick={() => onComplete({ stepsOrder: [...placedCardIds], waitingStepId: spottedWaitStepId })}
               className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl shadow-lg transition"
             >
               收下法宝碎片，前往第 2 站 →

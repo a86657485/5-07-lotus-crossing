@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StationModalThreeQuestions } from '../common/StationModalThreeQuestions';
 import { ScaffoldDialog } from '../common/ScaffoldDialog';
 import { S3State } from '../../types';
@@ -31,11 +31,20 @@ export const Station3TimingDispatchView: React.FC<Station3TimingDispatchViewProp
 
   const [scaffoldLevel, setScaffoldLevel] = useState<1 | 2 | 3 | null>(null);
   const [scaffoldPrompt, setScaffoldPrompt] = useState('');
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearPendingTimer = () => {
+    if (pendingTimer.current !== null) clearTimeout(pendingTimer.current);
+    pendingTimer.current = null;
+  };
+
+  useEffect(() => () => clearPendingTimer(), []);
 
   // 1. Run Fault
   const handleRunFault = () => {
+    clearPendingTimer();
     setPhase('fault_running');
-    setTimeout(() => {
+    pendingTimer.current = setTimeout(() => {
+      pendingTimer.current = null;
       setPhase('congested');
       setS3State(prev => ({ ...prev, faultObserved: true }));
     }, 2000);
@@ -56,7 +65,9 @@ export const Station3TimingDispatchView: React.FC<Station3TimingDispatchViewProp
     if (reason === '让车更快疏散，小设置服务整条路口') {
       setS3State(prev => ({ ...prev, reason }));
       setPhase('revalidate_running');
-      setTimeout(() => {
+      clearPendingTimer();
+      pendingTimer.current = setTimeout(() => {
+        pendingTimer.current = null;
         setPhase('cleared');
         setS3State(prev => ({ ...prev, revalidateOk: true }));
       }, 2000);
@@ -68,6 +79,7 @@ export const Station3TimingDispatchView: React.FC<Station3TimingDispatchViewProp
 
   // Reset station
   const handleReset = () => {
+    clearPendingTimer();
     setPhase('test_fault');
     setS3State({
       faultObserved: false,

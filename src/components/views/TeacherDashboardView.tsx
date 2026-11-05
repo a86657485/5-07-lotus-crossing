@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { ClassId, StudentSessionRecord } from '../../types';
 import { CLASS_ROSTERS, TOTAL_STUDENTS_COUNT } from '../../data/roster';
 import { apiTeacher, teacherExportUrl, TeacherPayload } from '../../api/client';
@@ -29,17 +29,21 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
   const [payload, setPayload] = useState<TeacherPayload | null>(null);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
+  const latestRequest = useRef(0);
 
   const refresh = useCallback(async () => {
+    const requestId = ++latestRequest.current;
     setLoading(true);
     try {
       const data = await apiTeacher(selectedClass === 'all' ? undefined : selectedClass);
+      if (requestId !== latestRequest.current) return;
       setPayload(data);
       setLoadError('');
     } catch (err: any) {
+      if (requestId !== latestRequest.current) return;
       setLoadError(err?.message || '教师数据加载失败');
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) setLoading(false);
     }
   }, [selectedClass]);
 
@@ -52,6 +56,7 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
   const sessions = useMemo(() => {
     const map: Record<string, StudentSessionRecord> = {};
     for (const row of payload?.students || []) {
+      if (!row.entered) continue;
       map[row.student.studentId] = {
         student: row.student,
         startedAt: row.lastSync || '',
@@ -145,11 +150,12 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
     const relevant = selectedClass === 'all'
       ? mergedStudentRows
       : mergedStudentRows.filter(r => r.student.classId === selectedClass);
+    const rosterRows = relevant.filter(r => r.student.rosterSource === 'roster');
     // Prefer row-derived counts so KPI 与名单 ✓ 同源；summary 作交叉校验兜底
-    const s1FromRows = relevant.filter(r => r.s1Ok).length;
-    const s2FromRows = relevant.filter(r => r.s2Ok).length;
-    const s3FromRows = relevant.filter(r => r.s3Ok).length;
-    const examFromRows = relevant.filter(r => r.passed).length;
+    const s1FromRows = rosterRows.filter(r => r.s1Ok).length;
+    const s2FromRows = rosterRows.filter(r => r.s2Ok).length;
+    const s3FromRows = rosterRows.filter(r => r.s3Ok).length;
+    const examFromRows = rosterRows.filter(r => r.passed).length;
     const loggedCount = payload?.summary.entered ?? relevant.filter(r => r.isLoggedIn).length;
     const s1Count = Math.max(payload?.summary.s1 ?? 0, s1FromRows);
     const s2Count = Math.max(payload?.summary.s2 ?? 0, s2FromRows);

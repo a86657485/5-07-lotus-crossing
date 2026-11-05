@@ -1,17 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { getStudentQuestions } from '../../data/questionsClient';
 import { ExamEvaluationResult, QuestionClient } from '../../types';
-import { apiSubmitExam } from '../../api/client';
+import { apiSubmitExam, ServerState } from '../../api/client';
 
 interface ExamViewProps {
   studentId: string;
-  onExamComplete: (result: ExamEvaluationResult, answers: Record<string, any>) => void;
+  initialAnswers?: Record<string, any>;
+  initialResult?: ExamEvaluationResult;
+  initialChallengeSubmitted?: boolean;
+  onExamComplete: (result: ExamEvaluationResult, answers: Record<string, any>, state: ServerState) => void;
   onOpenRewardGame?: () => void;
   onBackToMap: () => void;
 }
 
 export const ExamView: React.FC<ExamViewProps> = ({
   studentId,
+  initialAnswers,
+  initialResult,
+  initialChallengeSubmitted = false,
   onExamComplete,
   onOpenRewardGame,
   onBackToMap,
@@ -22,16 +28,17 @@ export const ExamView: React.FC<ExamViewProps> = ({
 
   const [activeTier, setActiveTier] = useState<'base' | 'challenge'>('base');
   const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
-  const [examSubmitted, setExamSubmitted] = useState(false);
-  const [examResult, setExamResult] = useState<ExamEvaluationResult | null>(null);
+  const [answers, setAnswers] = useState<Record<string, any>>(initialAnswers || {});
+  const [examSubmitted, setExamSubmitted] = useState(!!initialResult);
+  const [examResult, setExamResult] = useState<ExamEvaluationResult | null>(initialResult || null);
+  const [challengeSubmitted, setChallengeSubmitted] = useState(initialChallengeSubmitted);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const currentQuestions = activeTier === 'base' ? baseQuestions : challengeQuestions;
   const currentQ = currentQuestions[currentQIndex] || currentQuestions[0];
-  // 挑战关：基础层达标后解锁（与结果条文案一致；不用易误读的锁 emoji）
-  const challengeUnlocked = !!(examSubmitted && examResult?.passed);
+  // design/05 §4.2: challenge unlocks after the base submission; bonus is separate.
+  const challengeUnlocked = examSubmitted;
 
   const handleSelectOption = (qid: string, val: any) => {
     setAnswers(prev => ({ ...prev, [qid]: val }));
@@ -54,10 +61,11 @@ export const ExamView: React.FC<ExamViewProps> = ({
     setSubmitting(true);
     setSubmitError('');
     try {
-      const res = await apiSubmitExam(studentId, answers);
+      const res = await apiSubmitExam(studentId, answers, activeTier);
       setExamResult(res.result);
       setExamSubmitted(true);
-      onExamComplete(res.result, answers);
+      setChallengeSubmitted(!!res.state.challengeFirstResult);
+      onExamComplete(res.result, answers, res.state);
     } catch (err: any) {
       setSubmitError(err?.message || '提交失败');
     } finally {
@@ -119,7 +127,7 @@ export const ExamView: React.FC<ExamViewProps> = ({
           <button
             type="button"
             disabled={!challengeUnlocked}
-            title={challengeUnlocked ? '基础层已达标，可进入挑战关' : '请先提交基础关并达标（≥13 且目标过半）'}
+            title={challengeUnlocked ? '基础层已提交，可进入挑战关' : '请先提交基础关'}
             onClick={() => {
               if (!challengeUnlocked) return;
               setActiveTier('challenge');
@@ -135,7 +143,7 @@ export const ExamView: React.FC<ExamViewProps> = ({
           >
             {challengeUnlocked
               ? (activeTier === 'challenge' ? '挑战关（作答中 · 6 题）' : '挑战关 · 已解锁（点此进入）')
-              : '挑战关（达标后解锁）'}
+              : '挑战关（提交基础关后解锁）'}
           </button>
         </div>
       </div>
@@ -163,13 +171,19 @@ export const ExamView: React.FC<ExamViewProps> = ({
               <p className="text-xs text-slate-400 mt-0.5">
                 {examResult.passed
                   ? '挑战关已解锁：点右上「挑战关 · 已解锁」或下方按钮进入加分题。'
-                  : '尚未达标：可重做基础关；达标后才会解锁挑战关。'}
+                  : '基础首答已保存。可查看作答并进入挑战关；挑战加分不改变基础达标结果。'}
               </p>
+              {challengeSubmitted && (
+                <p className="text-xs text-purple-200 mt-1">
+                  挑战首答：{examResult.challengeScore} / {examResult.challengeTotal}
+                  {examResult.challengePassed ? ' · 已达加分线（≥4/6）' : ' · 未达加分线（4/6）'}
+                </p>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {examResult.passed && (
+            {challengeUnlocked && (
               <button
                 type="button"
                 onClick={() => {

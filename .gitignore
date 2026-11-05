@@ -14,5 +14,6 @@ runtime/
 godot/project/.godot/
 
 .playwright-cli/
+output/playwright/
 docs/screenshots/*.wav
 

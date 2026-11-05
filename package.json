@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/utils/evaluation.test.ts && node quiz.test.cjs",
+    "test": "tsx --test src/utils/*.test.ts src/api/*.test.ts && node quiz.test.cjs && node --test server.test.cjs godot/bridge/classroom_bridge.test.cjs",
     "server": "node --no-warnings server.cjs",
     "start": "node --no-warnings server.cjs",
     "quiz:test": "node quiz.test.cjs"
