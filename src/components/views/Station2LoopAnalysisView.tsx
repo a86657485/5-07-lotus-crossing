@@ -3,8 +3,14 @@ import { StationModalThreeQuestions } from '../common/StationModalThreeQuestions
 import { ScaffoldDialog } from '../common/ScaffoldDialog';
 import { FlowTerminal, FlowProcess, FlowDecision, FlowReturnEdge } from '../common/FlowchartPrimitives';
 
+export interface Station2Evidence {
+  s2_rewrite: { condition: string | null; action: string | null; backEdge: string | null };
+  s2_vs_branch: { choice: 'loop' | 'branch' | null };
+  s2_kettle: { condition: string | null; action: string | null; timing: 'ask_first' | 'do_first' | null };
+}
+
 interface Station2LoopAnalysisViewProps {
-  onComplete: () => void;
+  onComplete: (evidence: Station2Evidence) => void;
   onBackToMap: () => void;
 }
 
@@ -673,7 +679,11 @@ export const Station2LoopAnalysisView: React.FC<Station2LoopAnalysisViewProps> =
               </p>
               <button
                 type="button"
-                onClick={onComplete}
+                onClick={() => onComplete({
+                  s2_rewrite: { condition: s2aCondition, action: s2aAction, backEdge: s2aBackEdge },
+                  s2_vs_branch: { choice: s2bChoice },
+                  s2_kettle: { condition: s2cCondition, action: s2cAction, timing: s2cTiming },
+                })}
                 className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl shadow-lg transition"
               >
                 收下回边箭头，前往第 3 站 →

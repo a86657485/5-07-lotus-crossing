@@ -1054,11 +1054,11 @@ func _on_s2c_done(data: Dictionary) -> void:
 	_refresh_quest()
 
 func _on_s3_done(data: Dictionary) -> void:
-	GameState.set_station_done(GameState.TASK_S3, true)
 	GameState.unlocked_relics["knob"] = true
 	if data.has("s3Detail") and data["s3Detail"] != null:
 		GameState.s3_detail = data["s3Detail"]
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S3, data))
+	GameState.set_station_done(GameState.TASK_S3, true)
 	ClassroomBridge.emit_to_js("progress:s3Detail", GameState.s3_detail)
 	_set_move_lock("station", false)
 	_play_station_dialogue([

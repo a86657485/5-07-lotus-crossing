@@ -110,6 +110,9 @@ func _update_gate() -> void:
 		"ruleChanged": rule_changed,
 		"revalidateOk": revalidate_ok,
 	}
+	if not revalidate_ok and bool(GameState.stations.get(GameState.TASK_S3, false)):
+		GameState.set_station_done(GameState.TASK_S3, false)
+	ClassroomBridge.emit_to_js("progress:s3Detail", GameState.s3_detail.duplicate())
 
 func _submit() -> void:
 	if not (fault_observed and revalidate_ok and strategy_id == STRATEGY_OK and reason_id == REASON_OK):
