@@ -1,97 +1,134 @@
 extends Control
-## S2-C 保温壶三标签；禁「循环体」文案
+## S2-C 保温壶教材式小流程图（E3／s2_kettle）；学生可见禁术语
 
 signal completed(payload: Dictionary)
 signal cancelled
 
-const COND_OK := "water_low"
-const REPEAT_OK := "keep_heat"
-const TIMING_OK := "ask_first"
+const FlowBoardScr = preload("res://scripts/ui/flowchart_board.gd")
 
-var condition_id: String = ""
-var repeat_step_id: String = ""
-var timing_choice: String = ""
-var _history: Array = []
-
-@onready var prompt: Label = $Panel/VBox/Prompt
-@onready var pot_l: Label = $Panel/VBox/PotAnim
-@onready var cond_row: HBoxContainer = $Panel/VBox/CondRow
-@onready var repeat_row: HBoxContainer = $Panel/VBox/RepeatRow
-@onready var timing_row: HBoxContainer = $Panel/VBox/TimingRow
-@onready var undo_btn: Button = $Panel/VBox/Tools/UndoBtn
-@onready var submit_btn: Button = $Panel/VBox/Tools/SubmitBtn
-@onready var back_btn: Button = $Panel/VBox/Tools/BackBtn
+var board: Control
 
 func _ready() -> void:
-	undo_btn.pressed.connect(_undo)
-	submit_btn.pressed.connect(_submit)
-	back_btn.pressed.connect(func(): cancelled.emit())
-	_fill()
+	_ensure()
 
-func _unhandled_input(event: InputEvent) -> void:
-	if visible and event.is_action_pressed("undo_step"):
-		_undo()
-		get_viewport().set_input_as_handled()
+func _ensure() -> void:
+	if board != null:
+		return
+	var panel := get_node_or_null("Panel") as PanelContainer
+	if panel == null:
+		panel = PanelContainer.new()
+		panel.name = "Panel"
+		panel.position = Vector2(80, 50)
+		panel.size = Vector2(1120, 580)
+		add_child(panel)
+	for c in panel.get_children():
+		c.queue_free()
+	var host := Control.new()
+	host.custom_minimum_size = Vector2(1080, 540)
+	panel.add_child(host)
+	board = FlowBoardScr.new()
+	board.set_anchors_preset(Control.PRESET_FULL_RECT)
+	host.add_child(board)
+	board.setup(_config())
+	board.submitted.connect(_on_sub)
+	board.cancelled.connect(func(): cancelled.emit())
 
 func open_station() -> void:
 	visible = true
-	condition_id = ""
-	repeat_step_id = ""
-	timing_choice = ""
-	_history.clear()
-	prompt.text = "阿莲：休息点的壶也在反复加热，先标清楚。\n贴标签：问什么、反复做什么、先问还是先做。"
-	pot_l.text = "保温壶待命（禁用「循环体」说法）"
+	_ensure()
+	board.setup(_config())
+	board.open_board()
+	if board.prompt_label:
+		board.prompt_label.text = "阿莲：休息点的壶也在反复加热，先标清楚。\n补条件、反复步骤，并标『先问再做』。"
 
-func _fill() -> void:
-	_btn(cond_row, "循环条件：水温是否够", COND_OK, "cond")
-	_btn(cond_row, "循环条件：第几次加热(干扰)", "count_n", "cond")
-	_btn(repeat_row, "反复步骤：继续加热／再检测", REPEAT_OK, "repeat")
-	_btn(repeat_row, "反复步骤：倒水喝掉(干扰)", "pour", "repeat")
-	_btn(timing_row, "先问再做", TIMING_OK, "timing")
-	_btn(timing_row, "先做再问", "do_first", "timing")
+func highlight_for_relic() -> String:
+	_ensure()
+	return board.highlight_next()
 
-func _btn(parent: HBoxContainer, text: String, id: String, kind: String) -> void:
-	var b := Button.new()
-	b.text = text
-	b.pressed.connect(_pick.bind(kind, id))
-	parent.add_child(b)
-
-func _pick(kind: String, id: String) -> void:
-	_history.push_back({"c": condition_id, "r": repeat_step_id, "t": timing_choice})
-	match kind:
-		"cond":
-			condition_id = id
-		"repeat":
-			repeat_step_id = id
-		"timing":
-			timing_choice = id
-	pot_l.text = "已贴：条件=%s｜反复=%s｜时机=%s" % [condition_id, repeat_step_id, timing_choice]
-
-func _undo() -> void:
-	if _history.is_empty():
-		return
-	var h: Dictionary = _history.pop_back()
-	condition_id = str(h.get("c", ""))
-	repeat_step_id = str(h.get("r", ""))
-	timing_choice = str(h.get("t", ""))
-	pot_l.text = "撤回后：条件=%s｜反复=%s｜时机=%s" % [condition_id, repeat_step_id, timing_choice]
-
-func _submit() -> void:
-	var ok := condition_id == COND_OK and repeat_step_id == REPEAT_OK and timing_choice == TIMING_OK
+func _on_sub(ok: bool, detail: Dictionary) -> void:
 	if not ok:
 		var n := GameState.bump_fail(GameState.TASK_S2C)
 		ClassroomBridge.request_scaffold(GameState.TASK_S2C, mini(n, 3), "M5")
-		pot_l.text = "壶空转或一直加热不判停。⌫ 重贴。\n图上先出现问句还是加热？"
+		if board.feedback_label:
+			board.feedback_label.text = _hint(n)
 		return
-	pot_l.text = "壶短循环：加热→检测→再加热…直到条件停 ✓"
+	var cond := str(detail.get("conditionCardId", detail.get("filled", {}).get("decide", "")))
+	var filled: Dictionary = detail.get("filled", {})
+	var timing := str(filled.get("timing", "k_timing_ask_first"))
+	var repeat_id := "k_repeat_check"
+	if filled.has("heat"):
+		repeat_id = "k_repeat_heat"
+	elif filled.has("check"):
+		repeat_id = "k_repeat_check"
 	completed.emit({
 		"evidenceCode": "E3",
 		"attemptKind": "first" if int(GameState.fail_counts.get(GameState.TASK_S2C, 0)) == 0 else "revision",
 		"correct": true,
 		"payload": {
 			"capture": "in_world_action",
-			"conditionId": condition_id,
-			"repeatStepId": repeat_step_id,
-			"timingChoice": timing_choice,
+			"conditionId": cond if cond != "" else "k_cond",
+			"repeatStepId": repeat_id,
+			"timingChoice": "ask_first" if timing.ends_with("ask_first") else "do_first",
 		},
 	})
+
+func _hint(n: int) -> String:
+	match n:
+		1:
+			return "图上先出现问句还是加热？菱形里能否答是或否？"
+		2:
+			return "先问：不够才加热。反复的是加热／检测，不是结束。"
+		_:
+			return "对照空调冷气小图想『先问／先做』，不引入术语。"
+
+func _config() -> Dictionary:
+	# 简化：缺检测、菱形、加热、时机；是回检测；否停
+	var nodes := [
+		{"id": "start", "kind": FlowBoardScr.NodeKind.START, "text": "开始保温", "pos": Vector2(360, 4), "size": Vector2(200, 36)},
+		{"id": "check", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "", "placeholder": "（填：检测水温）", "pos": Vector2(350, 55), "size": Vector2(220, 40), "slot": true},
+		{"id": "decide", "kind": FlowBoardScr.NodeKind.DECISION, "text": "", "placeholder": "（填条件）", "pos": Vector2(330, 115), "size": Vector2(260, 64), "slot": true},
+		{"id": "heat", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "", "placeholder": "（填：继续加热）", "pos": Vector2(80, 130), "size": Vector2(180, 40), "slot": true},
+		{"id": "stop", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "停止加热", "pos": Vector2(360, 230), "size": Vector2(200, 40)},
+		{"id": "end", "kind": FlowBoardScr.NodeKind.END, "text": "可以倒水", "pos": Vector2(360, 295), "size": Vector2(200, 36)},
+		{"id": "timing", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "", "placeholder": "（时机标签）", "pos": Vector2(700, 55), "size": Vector2(200, 40), "slot": true},
+	]
+	return {
+		"mode": "fill",
+		"submit_text": "锁定通关",
+		"nodes": nodes,
+		"fixed_edges": [
+			{"from": "start", "to": "check"},
+			{"from": "stop", "to": "end"},
+		],
+		"cards": [
+			{"id": "k_cond", "text": "水温是否低于设定？"},
+			{"id": "k_repeat_heat", "text": "继续加热"},
+			{"id": "k_repeat_check", "text": "检测水温"},
+			{"id": "k_timing_ask_first", "text": "先问再做"},
+			{"id": "k_timing_do_first", "text": "先做再问"},
+			{"id": "k_cond_100", "text": "是不是正好 100℃？"},
+			{"id": "k_branch_like", "text": "要红茶还是绿茶？"},
+			{"id": "k_stop_as_repeat", "text": "到达对面"},
+		],
+		"slot_order": ["check", "decide", "heat", "timing", "wire:yes", "wire:no"],
+		"slot_tips": {
+			"check": "点「检测水温」填入反复／先问步",
+			"decide": "点「水温是否低于设定？」填菱形",
+			"heat": "点「继续加热」",
+			"timing": "点「先问再做」",
+			"wire:yes": "点『是』再点『检测水温』或『继续加热』旁路径目标——接到检测",
+			"wire:no": "点『否』再点『停止加热』",
+		},
+		"expect": {
+			"slots": {
+				"check": "k_repeat_check",
+				"decide": "k_cond",
+				"heat": "k_repeat_heat",
+				"timing": "k_timing_ask_first",
+			},
+			"wires": {"yes": "check", "no": "stop"},
+		},
+		"ok_feedback": "壶短循环：检测→不够加热→再检测…直到可倒水 ✓",
+		"bad_feedback": "壶空转或一直加热不判停。⌫ 重贴。",
+		"idle_feedback": "保温壶待命（先问够不够，再决定要不要加热）",
+	}

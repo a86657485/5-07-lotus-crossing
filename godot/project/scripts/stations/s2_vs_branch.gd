@@ -1,54 +1,56 @@
 extends Control
-## S2-B 并排意图屏：循环 vs 分支
+## S2-A/B：循环≠分支点选＋回边高亮（E2／s2_vs_branch）
 
 signal completed(payload: Dictionary)
 signal cancelled
 
-var selected_side: String = ""  # loop | branch
-var highlighted_back: bool = false
+const FlowBoardScr = preload("res://scripts/ui/flowchart_board.gd")
 
-@onready var prompt: Label = $Panel/VBox/Prompt
-@onready var anim_l: Label = $Panel/VBox/AnimFeedback
-@onready var loop_btn: Button = $Panel/VBox/Screens/LoopBtn
-@onready var branch_btn: Button = $Panel/VBox/Screens/BranchBtn
-@onready var edge_btn: Button = $Panel/VBox/EdgeBtn
-@onready var submit_btn: Button = $Panel/VBox/Tools/SubmitBtn
-@onready var back_btn: Button = $Panel/VBox/Tools/BackBtn
+var board: Control
 
 func _ready() -> void:
-	loop_btn.pressed.connect(func(): _select("loop"))
-	branch_btn.pressed.connect(func(): _select("branch"))
-	edge_btn.pressed.connect(_highlight_edge)
-	submit_btn.pressed.connect(_submit)
-	back_btn.pressed.connect(func(): cancelled.emit())
+	_ensure()
+
+func _ensure() -> void:
+	if board != null:
+		return
+	var panel := get_node_or_null("Panel") as PanelContainer
+	if panel == null:
+		panel = PanelContainer.new()
+		panel.name = "Panel"
+		panel.position = Vector2(80, 50)
+		panel.size = Vector2(1120, 580)
+		add_child(panel)
+	for c in panel.get_children():
+		c.queue_free()
+	var host := Control.new()
+	host.custom_minimum_size = Vector2(1080, 540)
+	panel.add_child(host)
+	board = FlowBoardScr.new()
+	board.set_anchors_preset(Control.PRESET_FULL_RECT)
+	host.add_child(board)
+	board.setup(_config())
+	board.submitted.connect(_on_sub)
+	board.cancelled.connect(func(): cancelled.emit())
 
 func open_station() -> void:
 	visible = true
-	selected_side = ""
-	highlighted_back = false
-	prompt.text = "①信号屏说不清『再等』停在哪。\n两张屏都有菱形。哪张在问还要不要再做？"
-	anim_l.text = "点选后看灯柱／行人动画。"
-	# 未作答零高亮：不改按钮主题色暗示答案
+	_ensure()
+	board.setup(_config())
+	board.open_board()
+	if board.prompt_label:
+		board.prompt_label.text = "①信号屏说不清『再等』停在哪。\n两张屏都有菱形。哪张在问还要不要再做？再标出绕回的箭头。"
 
-func _select(side: String) -> void:
-	selected_side = side
-	if side == "loop":
-		anim_l.text = "灯柱再闪一轮观察动画（循环）"
-	else:
-		anim_l.text = "行人一次性走天桥或等灯，不再绕回（分支）"
+func highlight_for_relic() -> String:
+	_ensure()
+	return board.highlight_next()
 
-func _highlight_edge() -> void:
-	highlighted_back = true
-	anim_l.text = "回边高亮：条件成立就再走一遍。"
-	if selected_side == "":
-		selected_side = "loop"
-
-func _submit() -> void:
-	var ok := selected_side == "loop" or highlighted_back
+func _on_sub(ok: bool, detail: Dictionary) -> void:
 	if not ok:
 		var n := GameState.bump_fail(GameState.TASK_S2B)
 		ClassroomBridge.request_scaffold(GameState.TASK_S2B, mini(n, 3), "M1")
-		anim_l.text = "两屏出口一样多吗？有没有箭头绕回来？"
+		if board.feedback_label:
+			board.feedback_label.text = _hint(n)
 		return
 	completed.emit({
 		"evidenceCode": "E2",
@@ -56,7 +58,39 @@ func _submit() -> void:
 		"correct": true,
 		"payload": {
 			"capture": "in_world_action",
-			"selectedSide": selected_side,
-			"highlightedBackEdge": highlighted_back,
+			"selectedSide": detail.get("side", "loop"),
+			"highlightedBackEdge": bool(detail.get("highlightedBackEdge", true)),
 		},
 	})
+
+func _hint(n: int) -> String:
+	match n:
+		1:
+			return "两屏出口一样多吗？有没有箭头绕回来？"
+		2:
+			return "选路各走一次；循环是再做一遍。"
+		_:
+			return "弯回去的那条，才是『再做』。（示意，不代点）"
+
+func _config() -> Dictionary:
+	return {
+		"mode": "pick_side",
+		"need_back_highlight": true,
+		"back_target": "observe",
+		"submit_text": "锁定通关",
+		"prompt": "点左屏＝循环；再点灰显回边确认『再做』。",
+		"cards": [
+			{"id": "intent_loop", "text": "这张在问：还要不要再做？"},
+			{"id": "intent_branch", "text": "这张在问：走哪一条路？"},
+			{"id": "intent_count", "text": "必须先知道做几次"},
+			{"id": "mark_back_edge", "text": "绕回来的箭头＝再做一遍"},
+			{"id": "mark_branch_exit", "text": "两个出口＝两条不同的路"},
+		],
+		"slot_tips": {
+			"pick": "点左侧循环屏，或点标签『还要不要再做』",
+			"wire:yes": "再点左屏绕回的『是』回边，确认高亮",
+		},
+		"expect": {"side": "loop"},
+		"ok_feedback": "灯柱再闪一轮；回边描亮 ✓",
+		"bad_feedback": "阿莲：这是选路，不是再做。",
+	}
