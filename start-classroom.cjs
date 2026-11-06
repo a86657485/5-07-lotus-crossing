@@ -7,9 +7,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createService } = require('./server.cjs');
+const { startHttpsProxy } = require('./https-proxy.cjs');
 
 const BASE = __dirname;
 const PORT = Number(process.env.PORT || 8797);
+const HTTPS_PORT = Number(process.env.HTTPS_PORT || 8443);
 const HOST = process.env.HOST || '0.0.0.0';
 const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'runtime');
 
@@ -60,20 +62,46 @@ service.server.on('error', (error) => {
   process.exit(1);
 });
 
-service.server.listen(PORT, HOST, () => {
+service.server.listen(PORT, HOST, async () => {
+  let https = null;
+  let httpsError = '';
+  try {
+    https = await startHttpsProxy({ targetPort: PORT, listenPort: HTTPS_PORT, host: HOST });
+  } catch (error) {
+    httpsError = error.message;
+  }
+
   console.log('');
   console.log(bar);
   console.log('  五年级第7课《重复操作用循环》· 莲花山智慧路口');
   console.log(bar);
-  console.log('  学生端（局域网）   ' + (primary ? 'http://' + primary + ':' + PORT : '未获取到局域网 IP'));
-  console.log('  教师大屏（局域网） ' + (primary ? 'http://' + primary + ':' + PORT + '/teacher' : '-'));
+  console.log(
+    '  学生端（推荐）    ' +
+      (https && primary ? 'https://' + primary + ':' + HTTPS_PORT : httpsError ? '（HTTPS 未启动，见下方提示）' : '未获取到局域网 IP')
+  );
+  console.log(
+    '  学生端（备用）    ' +
+      (primary ? 'http://' + primary + ':' + PORT + '  （Godot 关卡不可用）' : '-')
+  );
+  console.log(
+    '  教师大屏          ' +
+      (primary ? (https ? 'https://' + primary + ':' + HTTPS_PORT + '/teacher' : 'http://' + primary + ':' + PORT + '/teacher') : '-')
+  );
   for (const ip of others) {
-    console.log('  备用地址           http://' + ip + ':' + PORT);
+    console.log('  备用地址          ' + (https ? 'https://' + ip + ':' + HTTPS_PORT : 'http://' + ip + ':' + PORT));
   }
-  console.log('  本机自测           http://127.0.0.1:' + PORT);
+  console.log('  本机自测          ' + (https ? 'https://127.0.0.1:' + HTTPS_PORT : 'http://127.0.0.1:' + PORT));
   console.log(line);
-  console.log('  数据目录           ' + DATA_DIR);
+  console.log('  数据目录          ' + DATA_DIR);
   console.log('  教师大屏免密，仅对局域网开放');
+  if (https) {
+    console.log('  HTTPS 证书        ' + (https.certInfo.reused ? '沿用已有自签证书' : '已按当前 IP 重新签发'));
+    console.log('  首次访问会提示"证书不受信任"，点 高级 → 继续前往 即可');
+    console.log('  Godot 关卡必须在 https 下打开，http 会报 Secure Context 错误');
+  } else {
+    console.log('  [注意] HTTPS 未启动：' + httpsError);
+    console.log('         学生端进入 Godot 关卡会报 Secure Context 错误');
+  }
   console.log(line);
   console.log('  上课期间请勿关闭本窗口；关闭窗口即停止服务。');
   console.log(bar);
