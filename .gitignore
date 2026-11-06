@@ -16,3 +16,4 @@ godot/project/.godot/
 .playwright-cli/
 docs/screenshots/*.wav
 
+.certs/
