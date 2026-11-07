@@ -1,17 +1,26 @@
 import React, { useState, useMemo } from 'react';
 import { getStudentQuestions } from '../../data/questionsClient';
 import { ExamEvaluationResult, QuestionClient } from '../../types';
-import { apiSubmitExam } from '../../api/client';
+import { apiSubmitExam, ServerState } from '../../api/client';
+import QuestionFigure from '../lesson/QuestionFigure';
 
 interface ExamViewProps {
   studentId: string;
-  onExamComplete: (result: ExamEvaluationResult, answers: Record<string, any>) => void;
+  initialAnswers?: Record<string, any>;
+  initialResult?: ExamEvaluationResult;
+  initialLatestResult?: ExamEvaluationResult;
+  initialChallengeSubmitted?: boolean;
+  onExamComplete: (result: ExamEvaluationResult, answers: Record<string, any>, state: ServerState) => void;
   onOpenRewardGame?: () => void;
   onBackToMap: () => void;
 }
 
 export const ExamView: React.FC<ExamViewProps> = ({
   studentId,
+  initialAnswers,
+  initialResult,
+  initialLatestResult,
+  initialChallengeSubmitted = false,
   onExamComplete,
   onOpenRewardGame,
   onBackToMap,
@@ -22,16 +31,18 @@ export const ExamView: React.FC<ExamViewProps> = ({
 
   const [activeTier, setActiveTier] = useState<'base' | 'challenge'>('base');
   const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
-  const [examSubmitted, setExamSubmitted] = useState(false);
-  const [examResult, setExamResult] = useState<ExamEvaluationResult | null>(null);
+  const [answers, setAnswers] = useState<Record<string, any>>(initialAnswers || {});
+  const [examSubmitted, setExamSubmitted] = useState(!!initialResult);
+  const [examResult, setExamResult] = useState<ExamEvaluationResult | null>(initialResult || null);
+  const [latestResult, setLatestResult] = useState<ExamEvaluationResult | null>(initialLatestResult || null);
+  const [challengeSubmitted, setChallengeSubmitted] = useState(initialChallengeSubmitted);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const currentQuestions = activeTier === 'base' ? baseQuestions : challengeQuestions;
   const currentQ = currentQuestions[currentQIndex] || currentQuestions[0];
-  // 挑战关：基础层达标后解锁（与结果条文案一致；不用易误读的锁 emoji）
-  const challengeUnlocked = !!(examSubmitted && examResult?.passed);
+  // design/05 §4.2: challenge unlocks after the base submission; bonus is separate.
+  const challengeUnlocked = examSubmitted;
 
   const handleSelectOption = (qid: string, val: any) => {
     setAnswers(prev => ({ ...prev, [qid]: val }));
@@ -54,10 +65,12 @@ export const ExamView: React.FC<ExamViewProps> = ({
     setSubmitting(true);
     setSubmitError('');
     try {
-      const res = await apiSubmitExam(studentId, answers);
+      const res = await apiSubmitExam(studentId, answers, activeTier);
       setExamResult(res.result);
+      setLatestResult(res.state.examLatestResult || res.result);
       setExamSubmitted(true);
-      onExamComplete(res.result, answers);
+      setChallengeSubmitted(!!res.state.challengeFirstResult);
+      onExamComplete(res.result, answers, res.state);
     } catch (err: any) {
       setSubmitError(err?.message || '提交失败');
     } finally {
@@ -119,7 +132,7 @@ export const ExamView: React.FC<ExamViewProps> = ({
           <button
             type="button"
             disabled={!challengeUnlocked}
-            title={challengeUnlocked ? '基础层已达标，可进入挑战关' : '请先提交基础关并达标（≥13 且目标过半）'}
+            title={challengeUnlocked ? '基础层已提交，可进入挑战关' : '请先提交基础关'}
             onClick={() => {
               if (!challengeUnlocked) return;
               setActiveTier('challenge');
@@ -135,7 +148,7 @@ export const ExamView: React.FC<ExamViewProps> = ({
           >
             {challengeUnlocked
               ? (activeTier === 'challenge' ? '挑战关（作答中 · 6 题）' : '挑战关 · 已解锁（点此进入）')
-              : '挑战关（达标后解锁）'}
+              : '挑战关（提交基础关后解锁）'}
           </button>
         </div>
       </div>
@@ -152,8 +165,9 @@ export const ExamView: React.FC<ExamViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm text-white">
-                  基础层得分：{examResult.baseScore} / {examResult.baseTotal}
+                  基础层首次得分：{examResult.baseScore} / {examResult.baseTotal}
                 </span>
+                {latestResult && <span className="text-xs text-slate-300">最近一次：{latestResult.baseScore} / {latestResult.baseTotal}</span>}
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
                   examResult.passed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                 }`}>
@@ -163,13 +177,19 @@ export const ExamView: React.FC<ExamViewProps> = ({
               <p className="text-xs text-slate-400 mt-0.5">
                 {examResult.passed
                   ? '挑战关已解锁：点右上「挑战关 · 已解锁」或下方按钮进入加分题。'
-                  : '尚未达标：可重做基础关；达标后才会解锁挑战关。'}
+                  : '基础首答已保存。可查看作答并进入挑战关；挑战加分不改变基础达标结果。'}
               </p>
+              {challengeSubmitted && (
+                <p className="text-xs text-purple-200 mt-1">
+                  挑战首答：{examResult.challengeScore} / {examResult.challengeTotal}
+                  {examResult.challengePassed ? ' · 已达加分线（≥4/6）' : ' · 未达加分线（4/6）'}
+                </p>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {examResult.passed && (
+            {challengeUnlocked && (
               <button
                 type="button"
                 onClick={() => {
@@ -239,19 +259,7 @@ export const ExamView: React.FC<ExamViewProps> = ({
               {currentQ.stem}
             </h3>
 
-            {/* Diagram reference schematic if applicable */}
-            {currentQ.diagramRef && (
-              <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-700 my-3 text-xs text-slate-300">
-                <span className="text-amber-400 font-semibold">【流程图提示】：</span>
-                {currentQ.diagramRef === 'order_no_backedge' && '到达路口 ➜ 观察并等待绿灯 ➜ 过马路 ➜ 到达对面（无回箭头）'}
-                {currentQ.diagramRef === 'branch_bridge' && '天桥分支：有天桥吗？是➜走天桥 / 否➜等绿灯过街（各自往前，无回边）'}
-                {currentQ.diagramRef === 'kettle_ask_first' && '保温壶：水温低于设定？是➜继续加热➜测温 / 否➜停止加热'}
-                {currentQ.diagramRef === 'diamond_has_action' && '图中菱形框内写有动作「原地观察红绿灯」'}
-                {currentQ.diagramRef === 'backedge_to_cross' && '回边接到了「过马路」框'}
-                {currentQ.diagramRef === 'ac_no_backedge_b18' && '空调调温流程图中去掉了回边箭头'}
-                {currentQ.diagramRef === 'whole_sequence_looped' && '把到达、等待、过街、对面整段都圈进了大回边'}
-              </div>
-            )}
+            <QuestionFigure question={currentQ}/>
 
             {currentQ.platform && (
               <div className="inline-block px-2.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[11px] font-semibold mb-3 border border-blue-500/40">

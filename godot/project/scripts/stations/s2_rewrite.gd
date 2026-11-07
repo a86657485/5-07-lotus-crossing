@@ -42,7 +42,7 @@ func open_station() -> void:
 	board.setup(_config())
 	board.open_board()
 	if board.prompt_label:
-		board.prompt_label.text = "①开放日队伍乱了，有人要乱穿。\n②帮阿莲把『一直等』画成带回箭头的图。\n③接对了，行人会按序走；灯会再闪再停。"
+		board.prompt_label.text = "帮等灯的行人补全流程，再试两种灯色情况。"
 
 func highlight_for_relic() -> String:
 	_ensure_board()
@@ -50,6 +50,7 @@ func highlight_for_relic() -> String:
 
 func _on_submitted(ok: bool, detail: Dictionary) -> void:
 	if not ok:
+		ClassroomBridge.report_evidence({"eventType": "attempt", "eventId": "%s-attempt-%s-%s" % [GameState.TASK_S2A, Time.get_unix_time_from_system(), Time.get_ticks_usec()], "taskId": GameState.TASK_S2A, "correct": false, "payload": {"detail": detail, "supportUsed": board._support_used or int(GameState.fail_counts.get(GameState.TASK_S2A, 0)) > 0}})
 		var n := GameState.bump_fail(GameState.TASK_S2A)
 		ClassroomBridge.request_scaffold(GameState.TASK_S2A, mini(n, 3), "M2")
 		if board and board.feedback_label:
@@ -62,11 +63,14 @@ func _on_submitted(ok: bool, detail: Dictionary) -> void:
 		"correct": true,
 		"payload": {
 			"capture": "in_world_action",
+			"supportUsed": board._support_used or int(GameState.fail_counts.get(GameState.TASK_S2A, 0)) > 0,
 			"conditionCardId": detail.get("conditionCardId", "cond_green_off"),
 			"repeatCardId": "observe",
 			"backEdgeTo": detail.get("backEdgeTo", "observe"),
 			"noEdgeTo": detail.get("noEdgeTo", "cross"),
-			"lightReplay": detail.get("lightReplay", "loop_then_exit"),
+			"lightReplay": detail.get("lightReplay", ""),
+			"caseResults": detail.get("caseResults", []),
+			"attemptHistory": detail.get("attemptHistory", []),
 		},
 	})
 
@@ -77,20 +81,21 @@ func _hint(n: int) -> String:
 		2:
 			return "『是』的箭头该指回还在做的那步吗？到达对面还要再做吗？"
 		_:
-			return "对照换地名示意图：菱形问未亮？是→弯回观察；否→过马路。"
+			return "想一想：还不能走时，需要再次做哪一步？"
 
 func _config() -> Dictionary:
 	var nodes := [
-		{"id": "start", "kind": FlowBoardScr.NodeKind.START, "text": "到达十字路口", "pos": Vector2(360, 6), "size": Vector2(220, 40)},
-		{"id": "observe", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "原地观察红绿灯", "pos": Vector2(360, 70), "size": Vector2(220, 44)},
-		{"id": "decide", "kind": FlowBoardScr.NodeKind.DECISION, "text": "", "placeholder": "（填：绿灯未亮起？）", "pos": Vector2(340, 145), "size": Vector2(260, 72), "slot": true},
-		{"id": "cross", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "过马路", "pos": Vector2(360, 260), "size": Vector2(220, 44)},
-		{"id": "end", "kind": FlowBoardScr.NodeKind.END, "text": "到达马路对面", "pos": Vector2(360, 330), "size": Vector2(220, 40)},
+		{"id": "start", "kind": FlowBoardScr.NodeKind.START, "text": "到达十字路口", "pos": Vector2(600, 2), "size": Vector2(220, 40)},
+		{"id": "observe", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "原地观察红绿灯", "pos": Vector2(600, 58), "size": Vector2(220, 44)},
+		{"id": "decide", "kind": FlowBoardScr.NodeKind.DECISION, "text": "", "placeholder": "选择判断条件", "pos": Vector2(580, 120), "size": Vector2(260, 64), "slot": true},
+		{"id": "cross", "kind": FlowBoardScr.NodeKind.PROCESS, "text": "过马路", "pos": Vector2(600, 220), "size": Vector2(220, 44)},
+		{"id": "end", "kind": FlowBoardScr.NodeKind.END, "text": "到达马路对面", "pos": Vector2(600, 276), "size": Vector2(220, 40)},
 	]
 	return {
 		"mode": "fill",
-		"prompt": "把正确判断放进菱形；点『是』再点观察框；点『否』再点过马路。",
-		"submit_text": "锁定并回放",
+		"prompt": "帮行人补全流程，再试两种信号灯情况。",
+		"submit_text": "运行第一种情况",
+		"crossing_simulation": true,
 		"nodes": nodes,
 		"fixed_edges": [
 			{"from": "start", "to": "observe"},
@@ -105,9 +110,9 @@ func _config() -> Dictionary:
 		],
 		"slot_order": ["decide", "wire:yes", "wire:no"],
 		"slot_tips": {
-			"decide": "点底部卡片「绿灯未亮起？」填入菱形空槽",
-			"wire:yes": "点菱形旁橙色『是』拉线柄，再点『原地观察红绿灯』",
-			"wire:no": "点菱形旁『否』拉线柄，再点『过马路』",
+			"decide": "从卡片中选择一个判断条件",
+			"wire:yes": "点『是』，再点要去的步骤",
+			"wire:no": "点『否』，再点要去的步骤",
 		},
 		"expect": {
 			"slots": {"decide": "cond_green_off"},

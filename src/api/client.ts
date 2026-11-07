@@ -1,12 +1,16 @@
-import { ExamEvaluationResult, Student, StudentSessionRecord } from '../types';
+import { ExamEvaluationResult, LearningEvidence, Student, StudentSessionRecord } from '../types';
+import { makeEventId } from '../utils/eventId';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
+// A token belongs to this tab's selected student; shared preview storage is not used.
+let sessionToken = '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       ...(init?.headers || {}),
     },
     ...init,
@@ -20,6 +24,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export type ServerState = StudentSessionRecord & {
   examOpen?: boolean;
+  challengeFirstResult?: ExamEvaluationResult | null;
+};
+
+export type StationEvidence = {
+  taskId: string;
+  correct?: boolean;
+  s3Detail?: ServerState['s3Detail'];
+  payload?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+export type ProgressPatch = Omit<Partial<ServerState>, 'stations'> & {
+  stations?: Partial<ServerState['stations']>;
+  evidence?: StationEvidence;
 };
 
 export async function apiLogin(input: {
@@ -27,7 +45,11 @@ export async function apiLogin(input: {
   studentId?: string;
   name?: string;
 }): Promise<{ student: Student; state: ServerState }> {
-  return request('/api/login', { method: 'POST', body: JSON.stringify(input) });
+  const result = await request<{ student: Student; state: ServerState; sessionToken: string }>(
+    '/api/login', { method: 'POST', body: JSON.stringify(input) }
+  );
+  sessionToken = result.sessionToken;
+  return result;
 }
 
 export async function apiGetState(studentId: string): Promise<{ student: Student; state: ServerState }> {
@@ -36,7 +58,7 @@ export async function apiGetState(studentId: string): Promise<{ student: Student
 
 export async function apiSaveProgress(
   studentId: string,
-  patch: Partial<ServerState>
+  patch: ProgressPatch
 ): Promise<{ student: Student; state: ServerState }> {
   return request('/api/progress', {
     method: 'POST',
@@ -51,13 +73,25 @@ export async function apiUseRelic(studentId: string): Promise<{ student: Student
   });
 }
 
+export async function apiReportEvidence(
+  studentId: string,
+  evidence: LearningEvidence
+): Promise<{ student: Student; state: ServerState }> {
+  return request('/api/evidence', {
+    method: 'POST',
+    body: JSON.stringify({ studentId, evidence }),
+  });
+}
+
 export async function apiSubmitExam(
   studentId: string,
-  answers: Record<string, any>
+  answers: Record<string, any>,
+  tier: 'base' | 'challenge' = 'base'
 ): Promise<{ student: Student; state: ServerState; result: ExamEvaluationResult }> {
+  const eventId = makeEventId('exam');
   return request('/api/exam/submit', {
     method: 'POST',
-    body: JSON.stringify({ studentId, answers, eventId: crypto.randomUUID() }),
+    body: JSON.stringify({ studentId, answers, eventId, tier }),
   });
 }
 
@@ -85,6 +119,15 @@ export type TeacherPayload = {
     rewardUnlocked: boolean;
     examOpen: boolean;
     s3Detail: StudentSessionRecord['s3Detail'];
+    evidence?: LearningEvidence[];
+    evidenceHistory?: LearningEvidence[];
+    priorEvidenceUnknown?: boolean;
+    examFirstResult?: ExamEvaluationResult | null;
+    challengeFirstResult?: ExamEvaluationResult | null;
+    examLatestResult?: ExamEvaluationResult | null;
+    examFirstAnswers?: Record<string, unknown> | null;
+    challengeFirstAnswers?: Record<string, unknown> | null;
+    examAnswers?: Record<string, unknown> | null;
   }>;
   updatedAt: string;
 };

@@ -48,6 +48,18 @@ export interface S3State {
   revalidateOk: boolean;
 }
 
+export interface LearningEvidence {
+  eventId: string;
+  taskId: TaskId | 'intro';
+  eventType: 'attempt' | 'evidence_attempt' | 'case_run' | 'scenario_run' | 'simulation_run' | 'evidence_lock' | 'station_reset' | 'current_invalidated';
+  correct?: boolean | null;
+  payload?: Record<string, unknown>;
+  clientTs?: string | null;
+  s3Detail?: S3State | null;
+  attemptKind?: 'first' | 'revision' | 'process' | 'confirmation' | 'unknown';
+  receivedAt?: string;
+}
+
 export interface QuestionClient {
   id: string;
   tier: 'base' | 'challenge';
@@ -99,6 +111,7 @@ export interface ExamEvaluationResult {
 
 export interface StudentSessionRecord {
   student: Student;
+  stateVersion?: number;
   startedAt: string;
   lastActiveAt: string;
   stations: StationProgress;
@@ -110,7 +123,14 @@ export interface StudentSessionRecord {
     misconceptionId?: string;
     ts: string;
   }[];
+  evidenceHistory?: LearningEvidence[];
+  priorEvidenceUnknown?: boolean;
   examResult?: ExamEvaluationResult;
+  examFirstResult?: ExamEvaluationResult | null;
+  challengeFirstResult?: ExamEvaluationResult | null;
+  examLatestResult?: ExamEvaluationResult | null;
+  examFirstAnswers?: Record<string, any> | null;
+  challengeFirstAnswers?: Record<string, any> | null;
   examAnswers?: Record<string, any>;
   rewardUnlocked: boolean;
 }

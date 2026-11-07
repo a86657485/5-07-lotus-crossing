@@ -1,0 +1,36 @@
+{
+  "checked": "2026-11-06",
+  "originalStoryFilesUnchangedInGit": true,
+  "files": [
+    {
+      "file": "cg_exam_ready.png",
+      "sha256": "a85cf5e5945e2a71c1b00477d1ae42de07df49ff473254ea33567fa23e0b95e4",
+      "webCopyMatches": true
+    },
+    {
+      "file": "cg_intro_crowd.png",
+      "sha256": "b2b1a3f64eedbd6f2b1fd6d02bb7164fccd9fd3bb17ca91efd92813c7644cced",
+      "webCopyMatches": true
+    },
+    {
+      "file": "cg_s1_flow_ok.png",
+      "sha256": "067823e9efce43765b303ee730d269de283f72800f2b144f4109898beb3db316",
+      "webCopyMatches": true
+    },
+    {
+      "file": "cg_s1_queue.png",
+      "sha256": "130c9a62e798a8b7d0f32dd418899774d93eac66088a3c8c6e38d955a9794c65",
+      "webCopyMatches": true
+    },
+    {
+      "file": "cg_s2_panel.png",
+      "sha256": "354d8e4971946fcf915eaf3a5405156f21f826fc65ad5456c0c5bb7f92f7f2b2",
+      "webCopyMatches": true
+    },
+    {
+      "file": "cg_s3_booth.png",
+      "sha256": "b6b4c93a805392083f20ce9f7336258b6353a08e8970fca14d0148b6bd9e8287",
+      "webCopyMatches": true
+    }
+  ]
+}

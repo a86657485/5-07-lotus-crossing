@@ -1,0 +1,80 @@
+{
+  "startedAt": "2026-11-06T07:17:04.708Z",
+  "base": "http://192.168.0.14:18997",
+  "checks": [
+    {
+      "name": "真实本机LAN HTTP使用兼容地图、无randomUUID也可登录",
+      "passed": true
+    },
+    {
+      "name": "当前学生API需要本次登录凭据",
+      "passed": true
+    },
+    {
+      "name": "先学卡教材图加载、首帧×关闭、重看及Esc均可用",
+      "passed": true
+    },
+    {
+      "name": "S1单步暂停位置稳定，两个灯态真实执行后通过",
+      "passed": true
+    },
+    {
+      "name": "S2三错依次出现观察、线索和换例子支架",
+      "passed": true
+    },
+    {
+      "name": "提示后退出重进仍保留支持记录，成功不是独立首答",
+      "passed": true
+    },
+    {
+      "name": "D3先判断与先执行在相同干净桌面得到0次和1次",
+      "passed": true
+    },
+    {
+      "name": "Maze同一规则在两种长度成立，退出不改变主线",
+      "passed": true
+    },
+    {
+      "name": "法宝消耗一次并聚焦真正下一步的操作区域",
+      "passed": true
+    },
+    {
+      "name": "显式重做清除本轮S3布置并恢复基准门禁，历史仍在",
+      "passed": true
+    },
+    {
+      "name": "LAN HTTP真实完成三站自动进入考核",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "notes": [
+    "The earlier score-label locator failure is superseded by the 2026-11-07 continuation: saved first/latest marks, all six challenge questions, actual challenge submission, replay and secure localhost bridge passed.",
+    "The pending reset / reload / automatic single upload / continued assessment case passed separately.",
+    "Screenshots B08/C02 at 768px were opened and visually inspected; diagrams stack and remain readable.",
+    "No real classroom records or the production 8797 service were used. No second physical student device was tested."
+  ],
+  "storyImages": [
+    "/lesson/story/cg_intro_crowd.png",
+    "/lesson/story/cg_s1_queue.png",
+    "/lesson/story/cg_s1_flow_ok.png",
+    "/lesson/story/cg_s2_panel.png",
+    "/lesson/story/cg_s3_booth.png",
+    "/lesson/story/cg_exam_ready.png"
+  ],
+  "challenge": [],
+  "studentId": "manual-1ccea7802dddc802083fd132",
+  "environment": {
+    "secure": false,
+    "uuid": "undefined",
+    "online": true
+  },
+  "fakeName": "LAN独立终验_1793949425396",
+  "baseB08Figures": 1,
+  "historicalControllerFailure": "locator.waitFor: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText(/基础层得分：/) to be visible\u001b[22m\n\n    at /Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-crossing-redesign-20261104/docs/verification/independent-20261106/check-lan-finish.cjs:18:450",
+  "continuationReports": [
+    "assessment-finish-20261107.json",
+    "pending-reset-finish-20261107.json"
+  ],
+  "status": "passed_with_continuation_reports"
+}

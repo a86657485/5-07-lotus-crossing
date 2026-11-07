@@ -66,23 +66,24 @@ func _install_js_bridge() -> void:
 	var cb_reset := JavaScriptBridge.create_callback(_js_reset)
 	var cb_focus := JavaScriptBridge.create_callback(_js_focus)
 	_js_cb_refs = [cb_session, cb_unlock, cb_exam_open, cb_exam_closed, cb_replay, cb_flow, cb_relic, cb_reset, cb_focus]
-	JavaScriptBridge.eval("window._g5l7Bind = function(name, cb){ window.G5L7Classroom.on(name, function(d){ cb(d); }); };", true)
-	var bind = JavaScriptBridge.get_interface("_g5l7Bind")
-	if bind:
-		bind.call("app:session", cb_session)
-		bind.call("station:unlock", cb_unlock)
-		bind.call("exam:open", cb_exam_open)
-		bind.call("exam:closed", cb_exam_closed)
-		bind.call("story:replay", cb_replay)
-		bind.call("flow:result", cb_flow)
-		bind.call("relic:sync", cb_relic)
-		bind.call("station:reset", cb_reset)
-		bind.call("station:focus", cb_focus)
+	JavaScriptBridge.eval("window._g5l7Bind = function(name, cb){ window.G5L7Classroom.on(name, function(d){ cb(JSON.stringify(d || {})); }); };", true)
+	var js_window = JavaScriptBridge.get_interface("window")
+	if js_window:
+		js_window._g5l7Bind("app:session", cb_session)
+		js_window._g5l7Bind("station:unlock", cb_unlock)
+		js_window._g5l7Bind("exam:open", cb_exam_open)
+		js_window._g5l7Bind("exam:closed", cb_exam_closed)
+		js_window._g5l7Bind("story:replay", cb_replay)
+		js_window._g5l7Bind("flow:result", cb_flow)
+		js_window._g5l7Bind("relic:sync", cb_relic)
+		js_window._g5l7Bind("station:reset", cb_reset)
+		js_window._g5l7Bind("station:focus", cb_focus)
 	# Also poll getStudent once
 	JavaScriptBridge.eval("""
 (function(){
-  var s = window.G5L7Classroom && window.G5L7Classroom.getStudent && window.G5L7Classroom.getStudent();
-  if (s) { window.G5L7Classroom.emit('app:session', s); }
+  var b = window.G5L7Classroom;
+  var s = b && b.getStudent && b.getStudent();
+  if (s) { b.setSession(s, b.getProgress && b.getProgress()); }
 })();
 """, true)
 
@@ -128,6 +129,9 @@ func _on_app_session(data: Dictionary) -> void:
 	GameState.apply_session(data)
 	if data.has("stations") and data["stations"] is Dictionary:
 		GameState.sync_stations(data["stations"])
+	var relics = data.get("relics", {})
+	if relics is Dictionary and relics.get("unlockedRelics") is Dictionary:
+		GameState.unlocked_relics = relics["unlockedRelics"].duplicate()
 	session_received.emit(data)
 
 func _to_dict(args: Array) -> Dictionary:
@@ -136,9 +140,10 @@ func _to_dict(args: Array) -> Dictionary:
 	var v = args[0]
 	if v is Dictionary:
 		return v
-	if typeof(v) == TYPE_OBJECT:
-		# JS object → try JSON via eval stringify already done by host
-		return {}
+	if v is String:
+		var parsed = JSON.parse_string(v)
+		if parsed is Dictionary:
+			return parsed
 	return {}
 
 func _post_ready() -> void:
