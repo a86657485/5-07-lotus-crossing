@@ -5,6 +5,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createService } = require('./server.cjs');
+const { BANK } = require('./quiz.cjs');
+const completeBase = Object.fromEntries(BANK.questions.filter(question => question.tier === 'base')
+  .map(question => [question.id, BANK.answers[question.id]]));
 
 test('station attempts and runs survive restart, and the first station unlocks the exam', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lotus-evidence-'));
@@ -197,7 +200,7 @@ test('case runs do not consume the first attempt; invalidation preserves history
     const other = await (await fetch(base + '/api/state?studentId=student-b', { headers: { Authorization: `Bearer ${tokens['student-b']}` } })).json();
     assert.equal(other.state.evidenceHistory.length, 0);
     assert.equal(other.state.examOpen, false);
-    state = await send('/api/exam/submit', { studentId: 'student-a', eventId: 'exam-after-edit', answers: {} });
+    state = await send('/api/exam/submit', { studentId: 'student-a', eventId: 'exam-after-edit', answers: completeBase });
     assert.equal(state.examOpen, true);
     assert.equal(state.stations.exam, true);
   } finally {

@@ -1,65 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useReducer } from 'react';
+import { initialTrafficRound, trafficRoundReducer } from '../../lesson/rewardTraffic';
 
 interface RewardLoopGameProps {
   onBackToMap: () => void;
 }
 
 export const RewardLoopGame: React.FC<RewardLoopGameProps> = ({ onBackToMap }) => {
-  // Game states: light states (green, yellow, red), queue counts, cars passed, timer
-  const [lightState, setLightState] = useState<'red' | 'yellow' | 'green'>('green');
-  const [carQueue, setCarQueue] = useState(2);
-  const [pedQueue, setPedQueue] = useState(1);
-  const [carsCleared, setCarsCleared] = useState(0);
-  const [pedsCleared, setPedsCleared] = useState(0);
-  const [loopCycle, setLoopCycle] = useState(1);
-  const [score, setScore] = useState(100);
+  const [round, dispatch] = useReducer(trafficRoundReducer, initialTrafficRound);
+  const { phase: lightState, carQueue, pedQueue, carsCleared, pedsCleared, completedLoops } = round;
+  const score = 100 + (carsCleared + pedsCleared) * 10;
+  const lightName = { green: '绿灯', yellow: '黄灯', red: '红灯' }[lightState];
 
-  // Auto arrival of vehicles & pedestrians
   useEffect(() => {
     const timer = setInterval(() => {
-      setCarQueue(q => Math.min(10, q + 1));
-      setPedQueue(p => Math.min(10, p + (Math.random() > 0.5 ? 1 : 0)));
+      dispatch({ type: 'arrival', pedestrian: Math.random() > 0.5 });
     }, 2500);
     return () => clearInterval(timer);
   }, []);
 
-  // Flow simulation based on current light
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (lightState === 'green') {
-        setCarQueue(q => {
-          if (q > 0) {
-            setCarsCleared(c => c + 1);
-            setScore(s => s + 10);
-            return q - 1;
-          }
-          return 0;
-        });
-      } else if (lightState === 'red') {
-        setPedQueue(p => {
-          if (p > 0) {
-            setPedsCleared(pc => pc + 1);
-            setScore(s => s + 10);
-            return p - 1;
-          }
-          return 0;
-        });
-      }
-    }, 1200);
+    const interval = setInterval(() => dispatch({ type: 'tick' }), 1200);
     return () => clearInterval(interval);
   }, [lightState]);
-
-  // Execute next phase in loop cycle
-  const handleNextLoopStep = () => {
-    if (lightState === 'green') {
-      setLightState('yellow');
-    } else if (lightState === 'yellow') {
-      setLightState('red');
-    } else {
-      setLightState('green');
-      setLoopCycle(c => c + 1);
-    }
-  };
 
   return (
     <div className="relative min-h-screen bg-slate-900 text-slate-100 flex flex-col p-4 select-none">
@@ -82,10 +44,10 @@ export const RewardLoopGame: React.FC<RewardLoopGameProps> = ({ onBackToMap }) =
 
         <div className="flex items-center gap-3 text-xs">
           <div className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">
-            指挥积分：<strong className="text-amber-400">{score}</strong>
+            本局指挥分：<strong className="text-amber-400">{score}</strong>
           </div>
           <div className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">
-            完成循环：<strong className="text-cyan-400">{loopCycle} 轮</strong>
+            完成循环：<strong className="text-cyan-400">{completedLoops} 轮</strong>
           </div>
         </div>
       </div>
@@ -171,15 +133,16 @@ export const RewardLoopGame: React.FC<RewardLoopGameProps> = ({ onBackToMap }) =
         <div className="mt-6 flex flex-col items-center gap-3">
           <button
             type="button"
-            onClick={handleNextLoopStep}
+            onClick={() => dispatch({ type: 'advance' })}
             className="w-full max-w-md py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-98 text-slate-950 font-extrabold text-base shadow-xl transition flex items-center justify-center gap-2"
           >
-            <span>🔄 推进循环下一步（当前：{lightState.toUpperCase()}）</span>
+            <span>🔄 推进循环下一步（当前：{lightName}）</span>
             <span>↩</span>
           </button>
           <p className="text-[11px] text-slate-400 text-center">
-            点击按顺序推进灯色，体验红 ➜ 绿 ➜ 黄 ➜ 循环往复的回边控制！
+            依次推进绿灯、黄灯、红灯，返回绿灯时完成一轮。
           </p>
+          <p className="text-[11px] text-slate-400 text-center">教学仿真中，红灯阶段为行人放行。</p>
         </div>
       </div>
     </div>

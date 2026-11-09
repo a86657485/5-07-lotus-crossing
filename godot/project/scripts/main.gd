@@ -25,6 +25,7 @@ var move_lock_reasons: Dictionary = {}
 var world: Node2D
 var _use_web_panels := false
 var _host_session_loaded := false
+var _relic_pending := false
 var exam_button: Button
 
 var s1: Control
@@ -71,6 +72,7 @@ func _ready() -> void:
 	ClassroomBridge.session_received.connect(_on_session)
 	ClassroomBridge.story_replay_request.connect(_on_replay_req)
 	ClassroomBridge.flow_result.connect(_on_web_flow_result)
+	ClassroomBridge.relic_result.connect(_on_relic_result)
 	GameState.stations_changed.connect(_refresh_teleports)
 	call_deferred("_start_flow")
 	if "--smoke" in OS.get_cmdline_user_args() or "--smoke" in OS.get_cmdline_args():
@@ -1126,8 +1128,8 @@ func _on_s3_done(data: Dictionary) -> void:
 	ClassroomBridge.emit_to_js("progress:s3Detail", GameState.s3_detail)
 	_set_move_lock("station", false)
 	_play_station_dialogue([
-		{"speaker": "阿莲", "text": "时长设对了，路口顺多了。", "image": "res://assets/story/cg_exam_ready.png"},
-		{"speaker": "阿莲", "text": "三站稳住了。可以去考核了。", "image": "res://assets/story/cg_exam_ready.png"},
+		{"speaker": "阿莲", "text": "这次模拟中，这一侧排队少了，另一侧等得更久。", "image": "res://assets/story/cg_exam_ready.png"},
+		{"speaker": "阿莲", "text": "三站的记录齐了，可以去考核。", "image": "res://assets/story/cg_exam_ready.png"},
 	], true, func():
 		_on_exam_opened()
 		_refresh_quest()
@@ -1138,38 +1140,49 @@ func _on_exam_opened() -> void:
 	_set_task("系统：三站完成，开始当课小测。（考核在网页侧）")
 
 func _on_relic() -> void:
+	if _relic_pending:
+		return
 	if GameState.relic_remaining <= 0:
 		_toast("法宝已用完。")
 		return
-	# 指路不代做
-	var tip := _relic_tip()
-	_toast(tip)
 	if OS.has_feature("web"):
+		_relic_pending = true
+		relic_hud.get_node("UseBtn").disabled = true
 		ClassroomBridge.use_relic()
+	elif GameState.consume_relic_local():
+		_toast(_relic_tip())
+
+func _on_relic_result(success: bool) -> void:
+	if not _relic_pending:
+		return
+	_relic_pending = false
+	relic_hud.get_node("UseBtn").disabled = false
+	if success:
+		_toast(_relic_tip())
 	else:
-		GameState.consume_relic_local()
+		_toast("暂时无法确认次数。连上课堂服务后再试。")
 
 func _relic_tip() -> String:
 	match GameState.active_station:
 		"s1":
 			if s1 and s1.has_method("highlight_for_relic"):
 				return "法宝：" + s1.highlight_for_relic()
-			return "法宝：把一直等改成：问还要不要再观察。点『是』拉回观察框。"
+			return "法宝：判断完以后，想想哪个结果需要再做一次。"
 		"s2a":
-			return "法宝：看哪张有箭头绕回来——那才是『再做』。"
+			return "法宝：沿着箭头看一遍，比较哪一步还会出现。"
 		"s2b":
 			if s2b and s2b.has_method("highlight_for_relic"):
 				return "法宝：" + s2b.highlight_for_relic()
-			return "法宝：看哪张有箭头绕回来——那才是『再做』。"
+			return "法宝：沿着箭头看一遍，比较哪一步还会出现。"
 		"s2c":
-			return "法宝：先问够不够：不够才加热，再检测——先问先做。"
+			return "法宝：比较两种水温，哪种情形会多做一步？"
 		"s3":
 			var g = GameState.gate_states.get(GameState.TASK_S3, "pre_missing")
 			if g == "pre_missing":
 				return "法宝：先点「运行路口」看清故障。"
 			return "法宝：已见故障——选时长与理由，再运行核对（勿只重复跑故障）。"
 		_:
-			return "法宝：按任务单顺序，先去引导台。"
+			return "法宝：" + _next_task_line(_next_focus_id())
 
 func _reset_current() -> void:
 	var map := {"s1": GameState.TASK_S2A, "s2a": GameState.TASK_S2B, "s2b": GameState.TASK_S2B, "s2c": GameState.TASK_S2C, "s3": GameState.TASK_S3}
@@ -1215,6 +1228,7 @@ func _refresh_teleports() -> void:
 	if exam_button:
 		exam_button.disabled = not (GameState.exam_ready() or GameState.exam_available)
 		exam_button.text = "再次检测" if bool(GameState.stations.get("exam", false)) else "进入考核"
+		exam_button.modulate = Color(1.15, 0.95, 0.55, 1.0) if _next_focus_id() == "exam" else Color.WHITE
 	# 唯一「下一步」琥珀高亮；未解锁禁用；其余弱化
 	if teleport_bar == null:
 		return

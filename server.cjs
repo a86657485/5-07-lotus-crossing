@@ -9,7 +9,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { isIP } = require('node:net');
 const { DatabaseSync } = require('node:sqlite');
-const { evaluateAnswers, QUIZ_VERSION } = require('./quiz.cjs');
+const { BANK, evaluateAnswers, hasCompleteRecordedAnswers, QUIZ_VERSION } = require('./quiz.cjs');
 
 const BASE = __dirname;
 const CLASSES = ['501', '502', '503', '504'];
@@ -46,13 +46,18 @@ function combinedFirstResult(base, challenge) {
   };
 }
 
-function clientPayload(payload) {
+function publicStudentPayload(payload, feedback) {
+  const { feedbackSession, submittedFeedback, ...publicPayload } = payload;
   const result = payload.result ? { ...payload.result, details: [] } : undefined;
   const state = { ...payload.state };
+  delete state.examFeedback;
+  delete state.legacyIncompleteExam;
+  delete state.relicUseIds;
+  if (feedback) state.examFeedback = feedback;
   for (const key of ['examResult', 'examFirstResult', 'challengeFirstResult', 'examLatestResult']) {
     if (state[key]) state[key] = { ...state[key], details: [] };
   }
-  return { ...payload, state, ...(result ? { result } : {}) };
+  return { ...publicPayload, state, ...(result ? { result } : {}) };
 }
 
 function fail(status, message, code) {
@@ -160,7 +165,18 @@ function createService(options = {}) {
     CREATE TABLE IF NOT EXISTS states(studentId TEXT PRIMARY KEY, json TEXT NOT NULL, lastSync TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS events(studentId TEXT NOT NULL, eventId TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(studentId, eventId));
     CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, studentId TEXT NOT NULL, createdAt TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS evidence(studentId TEXT NOT NULL, eventId TEXT NOT NULL, json TEXT NOT NULL, createdAt TEXT NOT NULL, PRIMARY KEY(studentId, eventId));`);
+    CREATE TABLE IF NOT EXISTS evidence(studentId TEXT NOT NULL, eventId TEXT NOT NULL, json TEXT NOT NULL, createdAt TEXT NOT NULL, PRIMARY KEY(studentId, eventId));
+    CREATE TABLE IF NOT EXISTS class_exam_pauses(classId TEXT PRIMARY KEY);`);
+
+  function isClassExamPaused(classId) {
+    return !!db.prepare('SELECT 1 FROM class_exam_pauses WHERE classId=?').get(classId);
+  }
+
+  function clientPayload(payload, feedback) {
+    const safe = publicStudentPayload(payload, feedback);
+    safe.state.examPaused = isClassExamPaused(payload.student.classId);
+    return safe;
+  }
 
   const rosterIds = new Set();
   const insertStudent = db.prepare(
@@ -193,11 +209,11 @@ function createService(options = {}) {
       .filter((student) => rosterIds.has(student.id) || student.manual);
   }
 
-  function classes() {
+  function classes(onlyRoster = false) {
     return CLASSES.map((id) => ({
       id,
       students: allStudents()
-        .filter((student) => student.classId === id)
+        .filter((student) => student.classId === id && (!onlyRoster || rosterIds.has(student.id)))
         .map(({ id: sid, name }) => ({ id: sid, name })),
     }));
   }
@@ -240,7 +256,9 @@ function createService(options = {}) {
       unlockedRelics: { whistle: ok.s1, arrow: ok.s2, knob: ok.s3 },
     };
     state.examResult = combinedFirstResult(state.examFirstResult, state.challengeFirstResult);
-    state.rewardUnlocked = !!state.examResult?.passed;
+    const base = state.examFirstResult;
+    state.rewardUnlocked = !!base && hasCompleteRecordedAnswers(state.examFirstAnswers, 'base')
+      && base.baseTotal > 0 && base.baseScore * 5 >= base.baseTotal * 4;
     state.examOpen = !!state.examOpen || ok.all || !!state.examFirstResult;
   }
 
@@ -289,6 +307,13 @@ function createService(options = {}) {
     // /teacher 免密；仅限制本机/局域网
     if (!isPrivateAddress(req.socket.remoteAddress)) fail(403, '教师入口仅开放给本机和局域网设备');
     checkOrigin(req);
+  }
+
+  function canManageExam(req) {
+    const address = req.socket.remoteAddress?.replace(/^::ffff:/i, '');
+    const localSocket = address === '::1' || address === '127.0.0.1';
+    const localHost = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i.test(req.headers.host || '');
+    return localSocket && localHost;
   }
 
   function studentGuard(req, studentId) {
@@ -349,13 +374,18 @@ function createService(options = {}) {
     }
   }
 
-  function teacherData(classId) {
+  function teacherData(classId, canManage = false) {
     if (classId && !CLASSES.includes(classId)) fail(400, '请选择五年级班级');
     const students = allStudents()
       .filter((student) => !classId || student.classId === classId)
       .map((student) => {
         const record = recordFor(student.id);
         const state = record.state;
+        const examFirstComplete = !!state?.examFirstResult && hasCompleteRecordedAnswers(state.examFirstAnswers, 'base');
+        const challengeFirstComplete = !!state?.challengeFirstResult && hasCompleteRecordedAnswers(state.challengeFirstAnswers, 'challenge');
+        const examLatestComplete = !!state?.examLatestResult && hasCompleteRecordedAnswers(state.examAnswers, 'base');
+        const incompleteBase = state?.legacyIncompleteExam?.base?.result || (!examFirstComplete ? state?.examFirstResult : null);
+        const incompleteChallenge = state?.legacyIncompleteExam?.challenge?.result || (!challengeFirstComplete ? state?.challengeFirstResult : null);
         return {
           student: toClientStudent(student),
           entered: record.entered,
@@ -366,6 +396,10 @@ function createService(options = {}) {
           examFirstResult: state?.examFirstResult || null,
           challengeFirstResult: state?.challengeFirstResult || null,
           examLatestResult: state?.examLatestResult || null,
+          examFirstComplete,
+          challengeFirstComplete,
+          examLatestComplete,
+          incompleteScores: { base: incompleteBase?.baseScore, challenge: incompleteChallenge?.challengeScore },
           examFirstAnswers: state?.examFirstAnswers || null,
           challengeFirstAnswers: state?.challengeFirstAnswers || null,
           examAnswers: state?.examAnswers || null,
@@ -386,13 +420,15 @@ function createService(options = {}) {
       (s) => s.stations.s2_rewrite && s.stations.s2_vs_branch && s.stations.s2_kettle
     ).length;
     const s3 = rosterStudents.filter((s) => s.stations.s3_timing).length;
-    const passed = rosterStudents.filter((s) => s.examResult?.passed).length;
-    const challengeBonus = rosterStudents.filter((s) => s.examResult?.challengePassed).length;
+    const passed = rosterStudents.filter((s) => s.examFirstComplete && s.examResult?.passed).length;
+    const challengeBonus = rosterStudents.filter((s) => s.challengeFirstComplete && s.examResult?.challengePassed).length;
     const relicUsed = rosterStudents.reduce((sum, s) => sum + (s.relics?.used || 0), 0);
 
     return {
       appId: APP_ID,
       quizVersion: QUIZ_VERSION,
+      examPauses: Object.fromEntries(CLASSES.map(id => [id, isClassExamPaused(id)])),
+      canManageExam: canManage,
       updatedAt: now(),
       denominator: rosterTotal,
       classCounts: Object.fromEntries(
@@ -420,17 +456,21 @@ function createService(options = {}) {
       '班级',
       '姓名',
       '学生ID',
-      '是否登录',
+      '是否已进入',
       'S1过街顺序',
       'S2信号拆解',
       'S3时长调度',
-      '基础考核得分',
-      'G1得分(/5)',
-      'G2得分(/3)',
+      '基础考核首答得分',
+      '基础考核最近得分',
+      '首答G1得分',
+      '首答G1满分',
+      '首答G2得分',
+      '首答G2满分',
       '是否达标',
       '挑战题得分(/6)',
       '挑战加分',
       '法宝已用(/3)',
+      '旧不完整卷成绩（不计有效首答）',
     ];
     const cell = (value) => {
       let text = String(value ?? '');
@@ -440,6 +480,13 @@ function createService(options = {}) {
     const lines = [headers.map(cell).join(',')];
     for (const row of data.students) {
       const s2ok = row.stations.s2_rewrite && row.stations.s2_vs_branch && row.stations.s2_kettle;
+      const first = row.examFirstComplete ? row.examFirstResult : null;
+      const latest = row.examLatestComplete ? row.examLatestResult : first;
+      const challenge = row.challengeFirstComplete ? row.challengeFirstResult : null;
+      const incomplete = [
+        row.incompleteScores.base === undefined ? '' : `基础 ${row.incompleteScores.base}`,
+        row.incompleteScores.challenge === undefined ? '' : `挑战 ${row.incompleteScores.challenge}`,
+      ].filter(Boolean).join('、');
       lines.push(
         [
           row.student.classId,
@@ -449,13 +496,17 @@ function createService(options = {}) {
           row.stations.s1_order ? '是' : '否',
           s2ok ? '是' : '否',
           row.stations.s3_timing ? '是' : '否',
-          row.examResult?.baseScore ?? '',
-          row.examResult?.g1Score ?? '',
-          row.examResult?.g2Score ?? '',
-          row.examResult ? (row.examResult.passed ? '达标' : '未达标') : '',
-          row.examResult?.challengeScore ?? '',
-          row.examResult?.challengePassed ? '是' : row.examResult ? '否' : '',
+          first?.baseScore ?? '',
+          latest?.baseScore ?? '',
+          first?.g1Score ?? '',
+          first?.g1Total ?? '',
+          first?.g2Score ?? '',
+          first?.g2Total ?? '',
+          first ? (first.passed ? '达标' : '未达标') : '',
+          challenge?.challengeScore ?? '',
+          challenge ? (challenge.challengePassed ? '是' : '否') : '',
           row.relics?.used ?? 0,
+          incomplete,
         ].map(cell).join(',')
       );
     }
@@ -530,18 +581,24 @@ function createService(options = {}) {
       if (req.method === 'POST') checkOrigin(req);
 
       if (req.method === 'GET' && route === '/api/config') {
+        const baseQuestions = BANK.questions.filter(question => question.tier === 'base');
+        const objectiveMinimum = goal => Math.ceil(baseQuestions.filter(question => question.goalIds.includes(goal)).length / 2);
         return json(res, 200, {
           appId: APP_ID,
           quizVersion: QUIZ_VERSION,
           relicQuota: RELIC_QUOTA,
-          passLine: { base: 13, baseTotal: 16, g1: 3, g2: 2, challenge: 4, challengeTotal: 6 },
+          passLine: {
+            base: BANK.tiers.base.passLine, baseTotal: baseQuestions.length,
+            g1: objectiveMinimum('G1'), g2: objectiveMinimum('G2'),
+            challenge: BANK.tiers.challenge.passLine, challengeTotal: BANK.tiers.challenge.count,
+          },
           denominator: rosterIds.size,
         });
       }
 
       if (req.method === 'GET' && route === '/api/roster') {
         return json(res, 200, {
-          classes: classes(),
+          classes: classes(true),
           total: rosterIds.size,
           classCounts: Object.fromEntries(
             CLASSES.map((id) => [id, allStudents().filter((s) => s.classId === id && !s.manual).length])
@@ -557,7 +614,18 @@ function createService(options = {}) {
       }
 
       if (req.method === 'GET' && route === '/api/teacher') {
-        return json(res, 200, teacherData(url.searchParams.get('classId')));
+        return json(res, 200, teacherData(url.searchParams.get('classId'), canManageExam(req)));
+      }
+
+      if (req.method === 'POST' && route === '/api/teacher/exam-close') {
+        if (!canManageExam(req)) fail(403, '请在运行课堂服务的电脑打开本机教师大屏管理考核。');
+        const body = await readBody(req);
+        if (!isObject(body) || !CLASSES.includes(body.classId) || typeof body.closed !== 'boolean') {
+          fail(400, '请选择班级并指定考核状态。');
+        }
+        if (body.closed) db.prepare('INSERT OR IGNORE INTO class_exam_pauses VALUES(?)').run(body.classId);
+        else db.prepare('DELETE FROM class_exam_pauses WHERE classId=?').run(body.classId);
+        return json(res, 200, { classId: body.classId, closed: isClassExamPaused(body.classId) });
       }
 
       if (req.method === 'GET' && route === '/api/teacher/export.csv') {
@@ -720,50 +788,90 @@ function createService(options = {}) {
       if (req.method === 'POST' && route === '/api/relic') {
         const body = await readBody(req);
         const student = studentGuard(req, body.studentId);
+        const eventId = eventIdFor(body.eventId);
         const record = recordFor(student.id);
         const state = record.state || initialState(toClientStudent(student));
+        const receipts = Array.isArray(state.relicUseIds) ? state.relicUseIds : [];
+        if (receipts.includes(eventId)) {
+          return json(res, 200, clientPayload({ student: toClientStudent(student), state, relics: state.relics }));
+        }
         if (state.relics.remaining <= 0) fail(409, '通关法宝次数已用完');
         state.relics.used += 1;
-        state.relics.remaining = Math.max(0, RELIC_QUOTA - state.relics.used);
-        state.relics.quota = RELIC_QUOTA;
+        state.relicUseIds = [...receipts, eventId];
         const saved = save(student.id, state);
         return json(res, 200, clientPayload({ student: toClientStudent(student), state: saved, relics: saved.relics }));
       }
 
       if (req.method === 'POST' && route === '/api/exam/submit') {
+        const { validateSubmission, hasCompleteRecordedAnswers, examFeedback, isExamQuestionId } = require('./quiz.cjs');
         const body = await readBody(req);
         const student = studentGuard(req, body.studentId);
         const eventId = eventIdFor(body.eventId);
         if (body.tier !== undefined && !['base', 'challenge'].includes(body.tier)) fail(400, '考核层级格式不正确');
         const record = recordFor(student.id);
         const state = record.state || initialState(toClientStudent(student));
+        const feedbackSession = crypto.createHash('sha256').update(req.headers.authorization).digest('hex');
         const ok = stationsOk(state.stations);
         if (!ok.all && !state.examOpen && !state.examFirstResult) fail(409, '请先完成三个探究站后再开考');
         const previous = db.prepare('SELECT result FROM events WHERE studentId=? AND eventId=?').get(student.id, eventId);
-        if (previous) return json(res, 200, clientPayload(JSON.parse(previous.result)));
+        if (previous) {
+          const stored = JSON.parse(previous.result);
+          const feedback = stored.feedbackSession === feedbackSession ? stored.submittedFeedback : undefined;
+          return json(res, 200, clientPayload(stored, feedback));
+        }
+        if (isClassExamPaused(student.classId)) fail(409, '本班考核已暂停，请等老师重新开放。', 'EXAM_PAUSED');
         if (!isObject(body.answers)) fail(400, '作答格式不正确');
-        if (body.tier === 'challenge' && !state.examFirstResult) fail(409, '请先提交基础考核后再做挑战题');
-        const challengeSubmitted = body.tier === 'challenge' || (body.tier === undefined && hasChallengeAnswers(body.answers));
-        const result = evaluateAnswers(body.answers);
-        if (!state.examFirstResult) {
-          state.examFirstAnswers = body.answers;
-          state.examFirstResult = result;
+        if (Object.keys(body.answers).some(id => !isExamQuestionId(id))) fail(400, '答卷含未知题号，请刷新后重试');
+        if (body.tier === 'challenge' && (!state.examFirstResult || !hasCompleteRecordedAnswers(state.examFirstAnswers, 'base'))) {
+          fail(409, '请先完整提交基础考核后再做挑战题');
         }
-        if (!state.challengeFirstResult && challengeSubmitted) {
-          state.challengeFirstAnswers = body.answers;
-          state.challengeFirstResult = result;
+
+        // Older clients may send a complete combined paper without an explicit tier.
+        const submittedTiers = body.tier ? [body.tier] : hasChallengeAnswers(body.answers) ? ['base', 'challenge'] : ['base'];
+        const submissions = submittedTiers.map(tier => {
+          const { missing, invalid, normalized } = validateSubmission(body.answers, tier);
+          if (invalid.length) fail(400, `这些题的作答格式不正确，请重新选择：${invalid.join('、')}`, 'EXAM_ANSWER_INVALID');
+          if (missing.length) fail(400, `请先补全这些题（配对题每一行都要选）：${missing.join('、')}`, 'EXAM_INCOMPLETE');
+          return { tier, normalized, result: evaluateAnswers(normalized) };
+        });
+
+        const latestAnswers = { ...state.examAnswers };
+        let latestBase = state.examLatestResult || state.examFirstResult;
+        let latestChallenge = state.challengeFirstResult ? state.examLatestResult || state.challengeFirstResult : null;
+        if (!latestChallenge) for (const id of Object.keys(latestAnswers)) if (id.startsWith('C')) delete latestAnswers[id];
+        const submittedFeedback = {};
+        delete state.examFeedback;
+        for (const { tier, normalized, result } of submissions) {
+          const firstResultKey = tier === 'base' ? 'examFirstResult' : 'challengeFirstResult';
+          const firstAnswersKey = tier === 'base' ? 'examFirstAnswers' : 'challengeFirstAnswers';
+          const oldResult = state[firstResultKey];
+          if (!oldResult || !hasCompleteRecordedAnswers(state[firstAnswersKey], tier)) {
+            if (oldResult) {
+              // Preserve the original snapshot and append-only event history as it was recorded.
+              state.legacyIncompleteExam = {
+                ...state.legacyIncompleteExam,
+                [tier]: { result: oldResult, answers: state[firstAnswersKey], archivedAt: now() },
+              };
+            }
+            state[firstAnswersKey] = normalized;
+            state[firstResultKey] = result;
+          }
+          Object.assign(latestAnswers, normalized);
+          submittedFeedback[tier] = examFeedback(tier, normalized, result);
+          if (tier === 'base') latestBase = result;
+          else latestChallenge = result;
         }
-        state.examAnswers = body.answers;
-        state.examLatestResult = result;
+        state.examAnswers = latestAnswers;
+        state.examLatestResult = combinedFirstResult(latestBase, latestChallenge);
         state.stations.exam = true;
         const payload = transaction(() => {
           const saved = save(student.id, state);
-          const value = { student: toClientStudent(student), state: saved, result: saved.examResult, eventId,
-            tier: body.tier || (challengeSubmitted ? 'challenge' : 'base') };
+          const value = { student: toClientStudent(student), state: saved, result: saved.examResult, eventId, feedbackSession, submittedFeedback,
+            tier: submittedTiers[submittedTiers.length - 1] };
           db.prepare('INSERT INTO events VALUES(?,?,?)').run(student.id, eventId, JSON.stringify(value));
           return value;
         });
-        return json(res, 200, clientPayload(payload));
+        return json(res, 200, clientPayload(payload, submittedFeedback));
       }
 
       if (route.startsWith('/api/')) fail(404, '接口不存在');

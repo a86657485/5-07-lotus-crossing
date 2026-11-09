@@ -106,7 +106,18 @@ export interface ExamEvaluationResult {
     correct: boolean;
     tier: 'base' | 'challenge';
     misconceptionId?: string;
+    misconceptionIds?: string[];
   }[];
+}
+
+export type ExamAnswer = string | Record<string, string>;
+export interface ExamReviewItem {
+  questionId: string;
+  correct: boolean;
+  submittedAnswer: ExamAnswer;
+  correctAnswer: ExamAnswer;
+  analysis: string;
+  relatedTaskId?: string;
 }
 
 export interface StudentSessionRecord {
@@ -132,5 +143,11 @@ export interface StudentSessionRecord {
   examFirstAnswers?: Record<string, any> | null;
   challengeFirstAnswers?: Record<string, any> | null;
   examAnswers?: Record<string, any>;
+  examFeedback?: Partial<Record<'base' | 'challenge', ExamReviewItem[]>>;
+  legacyIncompleteExam?: Partial<Record<'base' | 'challenge', {
+    result: ExamEvaluationResult;
+    answers: Record<string, ExamAnswer> | null;
+    archivedAt: string;
+  }>>;
   rewardUnlocked: boolean;
 }

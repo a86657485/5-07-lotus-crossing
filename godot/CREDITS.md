@@ -8,6 +8,7 @@
 - Godot Engine 4.7.2 — MIT License（https://godotengine.org）
 - 网页流程图：React Flow / `@xyflow/react` 12.12.1，MIT，https://github.com/xyflow/xyflow；许可副本随网页保存在 `public/lesson/ReactFlow-LICENSE.txt`。
 - Blockly Games Maze 与 Botbright 用于交互机制参考：运行规则观察角色、逐步执行、暂停重试、变条件迁移。本次未复制这两个项目的源码、人物、关卡或音频。
+- 奖励小游戏的放行逻辑由 Ruoyu Sun 的 [Traffic Light](https://github.com/insraq/traffic_planner/tree/9fb04d68f3b9d0888aadac2b036b92dc2e36c2ca) 的 `Crossroad.cs` 改编。本课把单击切换通行方向改为逐步推进绿、黄、红灯，保留按阶段放行并记录已完成循环。代码许可为 MIT，版权 Copyright 2018 Ruoyu Sun。许可证副本位于 `public/lesson/TrafficLight-LICENSE.txt`。
 - `public/lesson/textbook-s1.png`、`textbook-s2.png`、`textbook-s3.png`：用户提供的本课教材第41–43页课堂引用片段，仅供本地本课教学使用；不将教材内容声明为本项目开源素材。
 
 ## 外引素材

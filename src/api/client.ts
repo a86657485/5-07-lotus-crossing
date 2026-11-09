@@ -1,4 +1,4 @@
-import { ExamEvaluationResult, LearningEvidence, Student, StudentSessionRecord } from '../types';
+import { ClassId, ExamEvaluationResult, LearningEvidence, Student, StudentSessionRecord } from '../types';
 import { makeEventId } from '../utils/eventId';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
@@ -24,6 +24,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export type ServerState = StudentSessionRecord & {
   examOpen?: boolean;
+  examPaused?: boolean;
   challengeFirstResult?: ExamEvaluationResult | null;
 };
 
@@ -56,6 +57,12 @@ export async function apiGetState(studentId: string): Promise<{ student: Student
   return request(`/api/state?studentId=${encodeURIComponent(studentId)}`);
 }
 
+export type RosterClass = { id: ClassId; students: Array<{ id: string; name: string }> };
+
+export function apiRoster(): Promise<{ classes: RosterClass[] }> {
+  return request('/api/roster');
+}
+
 export async function apiSaveProgress(
   studentId: string,
   patch: ProgressPatch
@@ -66,11 +73,18 @@ export async function apiSaveProgress(
   });
 }
 
-export async function apiUseRelic(studentId: string): Promise<{ student: Student; state: ServerState }> {
-  return request('/api/relic', {
-    method: 'POST',
-    body: JSON.stringify({ studentId }),
-  });
+export async function apiUseRelic(studentId: string, eventId = makeEventId('relic')): Promise<{ student: Student; state: ServerState }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    return await request('/api/relic', {
+      method: 'POST',
+      body: JSON.stringify({ studentId, eventId }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function apiReportEvidence(
@@ -96,6 +110,8 @@ export async function apiSubmitExam(
 }
 
 export type TeacherPayload = {
+  canManageExam: boolean;
+  examPauses: Record<string, boolean>;
   denominator: number;
   classCounts: Record<string, number>;
   summary: {
@@ -125,6 +141,10 @@ export type TeacherPayload = {
     examFirstResult?: ExamEvaluationResult | null;
     challengeFirstResult?: ExamEvaluationResult | null;
     examLatestResult?: ExamEvaluationResult | null;
+    examFirstComplete: boolean;
+    challengeFirstComplete: boolean;
+    examLatestComplete: boolean;
+    incompleteScores?: { base?: number; challenge?: number };
     examFirstAnswers?: Record<string, unknown> | null;
     challengeFirstAnswers?: Record<string, unknown> | null;
     examAnswers?: Record<string, unknown> | null;
@@ -135,6 +155,13 @@ export type TeacherPayload = {
 export async function apiTeacher(classId?: string): Promise<TeacherPayload> {
   const q = classId ? `?classId=${encodeURIComponent(classId)}` : '';
   return request(`/api/teacher${q}`);
+}
+
+export async function apiSetClassExamPaused(classId: string, closed: boolean): Promise<{ classId: string; closed: boolean }> {
+  return request('/api/teacher/exam-close', {
+    method: 'POST',
+    body: JSON.stringify({ classId, closed }),
+  });
 }
 
 export function teacherExportUrl(classId?: string): string {

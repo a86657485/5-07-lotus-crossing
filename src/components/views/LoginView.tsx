@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ClassId, Student } from '../../types';
-import { CLASS_ROSTERS, searchStudentsInClass, createManualStudent } from '../../data/roster';
+import { buildRoster, createManualStudent } from '../../data/roster';
+import { apiRoster } from '../../api/client';
 
 interface LoginViewProps {
   onLogin: (student: Student) => void;
@@ -13,10 +14,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [isManualInput, setIsManualInput] = useState(false);
   const [manualName, setManualName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [roster, setRoster] = useState(() => buildRoster([]));
+  const [rosterStatus, setRosterStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [rosterRequest, setRosterRequest] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiRoster().then(({ classes }) => {
+      if (cancelled) return;
+      setRoster(buildRoster(classes));
+      setRosterStatus('ready');
+    }).catch(() => {
+      if (!cancelled) setRosterStatus('error');
+    });
+    return () => { cancelled = true; };
+  }, [rosterRequest]);
 
   const currentClassStudents = useMemo(() => {
-    return searchStudentsInClass(selectedClass, searchQuery);
-  }, [selectedClass, searchQuery]);
+    const query = searchQuery.trim().toLowerCase();
+    return roster[selectedClass].filter(student => student.name.toLowerCase().includes(query));
+  }, [roster, selectedClass, searchQuery]);
 
   const handleSelectStudent = (s: Student) => {
     setSelectedStudent(s);
@@ -85,7 +102,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             </label>
             <div className="grid grid-cols-4 gap-2.5">
               {(['501', '502', '503', '504'] as ClassId[]).map(c => {
-                const count = CLASS_ROSTERS[c].length;
+                const count = roster[c].length;
                 const isSelected = selectedClass === c;
                 return (
                   <button
@@ -100,7 +117,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                   >
                     <div>{c} 班</div>
                     <div className={`text-[10px] font-normal mt-0.5 ${isSelected ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {count} 人
+                      {rosterStatus === 'ready' ? `${count} 人` : '—'}
                     </div>
                   </button>
                 );
@@ -148,7 +165,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="快速搜索姓名拼音或汉字..."
+                  placeholder="输入姓名关键词"
                   className="w-full bg-slate-900/70 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none transition"
                 />
 
@@ -173,7 +190,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                   })}
                   {currentClassStudents.length === 0 && (
                     <div className="col-span-full py-6 text-center text-xs text-slate-500">
-                      未找到对应同学，可切换上方为手动输入
+                      {rosterStatus === 'loading' ? '正在读取本班名单…' : rosterStatus === 'error' ? (
+                        <button type="button" className="text-amber-400 underline" onClick={() => {
+                          setRosterStatus('loading');
+                          setRosterRequest(value => value + 1);
+                        }}>名单暂时加载失败，点此重试</button>
+                      ) : '未找到对应同学，可切换上方为手动输入'}
                     </div>
                   )}
                 </div>

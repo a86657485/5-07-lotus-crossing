@@ -18,7 +18,7 @@ export type LessonHostProps = {
   runId?: string;
   onEvidence: (envelope: any) => void;
   onExamOpen: () => void;
-  onRelicUse: () => void;
+  onRelicUse: () => Promise<boolean>;
   onS3Detail?: (detail: S3State) => void;
 };
 
@@ -78,7 +78,12 @@ function GodotEmbeddedView(props: LessonHostProps) {
       const { event, payload } = ev.data as { event: string; payload: any };
       if (event === 'evidence:report' || event === 'station:complete') props.onEvidence(payload);
       if (event === 'exam:open') props.onExamOpen();
-      if (event === 'relic:use') props.onRelicUse();
+      if (event === 'relic:use') {
+        void props.onRelicUse().then(
+          success => postToGodot('relic:result', { success }),
+          () => postToGodot('relic:result', { success: false }),
+        );
+      }
       if (event === 'progress:s3Detail') props.onS3Detail?.(payload);
       if (event === 'station:reset') {
         const resetStation = TASK_STATIONS[payload?.taskId];

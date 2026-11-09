@@ -91,12 +91,15 @@ export default function App() {
 
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [currentSession, setCurrentSession] = useState<ServerState | null>(null);
+  const [recentExamFeedback, setRecentExamFeedback] = useState<ServerState['examFeedback']>();
   const [syncError, setSyncError] = useState('');
   const [currentView, setCurrentView] = useState<'login' | 'godot' | 'exam' | 'reward_game'>('login');
   const pendingEvidence = useRef<PendingEvidence[]>(readPendingEvidence());
   const evidenceDrain = useRef<Promise<void> | null>(null);
   const retryTimer = useRef<number | null>(null);
   const examRequested = useRef(false);
+  const relicInFlight = useRef(false);
+  const relicAttempt = useRef<{ studentId: string; eventId: string } | null>(null);
   const activeStudent = useRef<string | null>(null);
   const sessionId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const syncQueue = useRef(createSyncQueue());
@@ -129,7 +132,8 @@ export default function App() {
           setSyncError('');
           if (examRequested.current && res.state.examOpen) {
             examRequested.current = false;
-            setCurrentView('exam');
+            if (res.state.examPaused) setSyncError('本班考核已暂停，等老师重新开放后再进入。');
+            else setCurrentView('exam');
           }
         }
       }
@@ -191,6 +195,7 @@ export default function App() {
         name: student.name,
       });
       setCurrentStudent(res.student);
+      setRecentExamFeedback(undefined);
       activeStudent.current = res.student.studentId;
       setCurrentSession(res.state);
       examRequested.current = false;
@@ -201,16 +206,34 @@ export default function App() {
     }
   };
 
-  const handleUseRelic = async () => {
-    if (!currentStudent) return;
+  const handleUseRelic = async (): Promise<boolean> => {
+    if (!currentStudent || relicInFlight.current) return false;
+    const studentId = currentStudent.studentId;
+    const storageKey = `g5l7.relicRequest.${studentId}`;
+    let savedId: string | null = null;
+    try { savedId = sessionStorage.getItem(storageKey); } catch { /* Retry in memory if browser storage is unavailable. */ }
+    const eventId = (relicAttempt.current?.studentId === studentId && relicAttempt.current.eventId)
+      || savedId || makeEventId('relic');
+    relicAttempt.current = { studentId, eventId };
+    try { sessionStorage.setItem(storageKey, eventId); } catch { /* Keep the current attempt in memory. */ }
+    relicInFlight.current = true;
     try {
-      const res = await syncQueue.current(() => apiUseRelic(currentStudent.studentId));
-      acceptServerState(currentStudent.studentId, res.state);
-       (window as any).G5L7Classroom?.emit?.('relic:sync', {
-        remaining: res.state.relics?.remaining ?? 0,
-      });
-    } catch (err: any) {
-      setSyncError(err?.message || '法宝使用失败');
+      const res = await syncQueue.current(() => apiUseRelic(studentId, eventId));
+      relicAttempt.current = null;
+      try { sessionStorage.removeItem(storageKey); } catch { /* Receipt remains safe to retry on the server. */ }
+      acceptServerState(studentId, res.state);
+      if (activeStudent.current !== studentId) return false;
+      setSyncError('');
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      const exhausted = message.includes('次数已用完');
+      if (activeStudent.current === studentId) {
+        setSyncError(exhausted ? message : '暂时无法确认法宝使用。请稍后再试。');
+      }
+      return false;
+    } finally {
+      relicInFlight.current = false;
     }
   };
 
@@ -228,7 +251,8 @@ export default function App() {
   };
 
   const handleExamComplete = (_result: ExamEvaluationResult, _answers: Record<string, any>, state: ServerState) => {
-    if (!currentStudent) return;
+    if (!currentStudent || activeStudent.current !== currentStudent.studentId) return;
+    if (state.examFeedback) setRecentExamFeedback(previous => ({ ...previous, ...state.examFeedback }));
     acceptServerState(currentStudent.studentId, state);
   };
 
@@ -240,10 +264,12 @@ export default function App() {
     try {
       const res = await syncQueue.current(() => apiGetState(currentStudent.studentId));
       acceptServerState(currentStudent.studentId, res.state);
+      if (res.state.examPaused) throw new Error('本班考核已暂停，等老师重新开放后再进入。');
       if (!res.state.examOpen) throw new Error('请先完成三个探究站并同步进度');
       examRequested.current = false;
       setCurrentView('exam');
     } catch (err: any) {
+      examRequested.current = false;
       setSyncError(err?.message || '开考核验失败，请重试');
     }
   };
@@ -291,7 +317,7 @@ export default function App() {
           examOpen={currentSession?.examOpen}
           onEvidence={handleEvidence}
           onExamOpen={() => void handleOpenExam()}
-          onRelicUse={() => void handleUseRelic()}
+          onRelicUse={handleUseRelic}
           onS3Detail={detail => {
             if (!currentSession) return;
             setCurrentSession(previous => previous ? { ...previous, s3Detail: detail } : previous);
@@ -305,6 +331,10 @@ export default function App() {
           studentId={currentStudent.studentId}
           initialAnswers={currentSession?.examAnswers || undefined}
           initialResult={currentSession?.examResult || undefined}
+          initialFeedback={recentExamFeedback}
+          initialFirstAnswers={currentSession?.examFirstAnswers}
+          initialChallengeFirstAnswers={currentSession?.challengeFirstAnswers}
+          rewardUnlocked={currentSession?.rewardUnlocked}
           initialLatestResult={currentSession?.examLatestResult || undefined}
           initialChallengeSubmitted={!!currentSession?.challengeFirstResult}
           onExamComplete={handleExamComplete}

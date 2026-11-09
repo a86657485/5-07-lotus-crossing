@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createService } = require('./server.cjs');
-const { BANK, evaluateAnswers } = require('./quiz.cjs');
+const { BANK, answerScalar, evaluateAnswers } = require('./quiz.cjs');
 
 const roster = [53, 53, 52, 54].flatMap((count, index) => Array.from({ length: count }, (_, student) => ({
   id: `synthetic-${index}-${student}`, classId: String(501 + index), name: `虚构学生${index}-${student}`,
@@ -19,6 +19,11 @@ const validS3 = {
 };
 const correctBase = Object.fromEntries(Object.entries(BANK.answers).filter(([id]) => id.startsWith('B')));
 const correctChallenge = Object.fromEntries(Object.entries(BANK.answers).filter(([id]) => id.startsWith('C')));
+
+function wrongChoice(id) {
+  const question = BANK.questions.find(item => item.id === id);
+  return (question.options || question.cards).find(choice => choice !== answerScalar(BANK.answers[id]));
+}
 
 async function fixture(t, customRoster = roster) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lotus-server-test-'));
@@ -124,6 +129,40 @@ test('station input accepts only known boolean fields and exam status remains se
   assert.deepEqual(unlocked, { whistle: true, arrow: false, knob: false });
 });
 
+test('retrying a confirmed relic request uses only one of the three chances', async t => {
+  const f = await fixture(t);
+  const a = await f.login();
+  const use = eventId => f.request('/api/relic', { studentId: a.id, eventId }, a.token);
+  const [first, retry] = await Promise.all([use('same-press'), use('same-press')]);
+  for (const result of [first, retry]) {
+    assert.equal(result.status, 200);
+    assert.equal(result.data.state.relics.remaining, 2);
+  }
+  await f.reopen();
+  assert.equal((await use('same-press')).data.state.relics.remaining, 2);
+  assert.equal((await use('second-press')).data.state.relics.remaining, 1);
+  assert.equal((await use('third-press')).data.state.relics.remaining, 0);
+  assert.equal((await use('same-press')).status, 200);
+  assert.equal((await use('fourth-press')).status, 409);
+});
+
+test('class pause persists across restart, blocks new submissions, and preserves earned eligibility', async t => {
+  const f = await fixture(t);
+  const student = await f.login();
+  await f.ready(student);
+  const pause = await f.request('/api/teacher/exam-close', { classId: '501', closed: true });
+  assert.equal(pause.status, 200);
+  assert.equal(pause.data.closed, true);
+  await f.reopen();
+  const { data: { state } } = await f.request(`/api/state?studentId=${student.id}`, undefined, student.token);
+  assert.equal(state.examPaused, true);
+  assert.equal(state.examOpen, true);
+  assert.equal((await f.submit(student, correctBase, 'paused-exam')).status, 409);
+  const reopened = await f.request('/api/teacher/exam-close', { classId: '501', closed: false });
+  assert.equal(reopened.data.closed, false);
+  assert.equal((await f.submit(student, correctBase, 'reopened-exam')).status, 200);
+});
+
 test('exam opens after current stations pass and stays available after later edits', async t => {
   const f = await fixture(t);
   const a = await f.login();
@@ -179,31 +218,42 @@ test('base and challenge first answers freeze independently, with latest retaine
   const f = await fixture(t);
   const a = await f.login();
   await f.ready(a);
-  let res = await f.submit(a, { B01: '错误' }, 'base-first');
-  assert.equal(res.data.result.baseScore, 0);
+  const firstWrong = { ...correctBase, B01: wrongChoice('B01'), B02: wrongChoice('B02'), B03: wrongChoice('B03') };
+  let res = await f.submit(a, firstWrong, 'base-first');
+  assert.equal(res.status, 200);
+  assert.equal(res.data.result.baseScore, 13);
   assert.equal(res.data.result.passed, false);
   assert.equal(res.data.state.challengeFirstResult, null);
-  assert.deepEqual(res.data.result.details, [], 'students do not receive grading details');
+  assert.deepEqual(res.data.result.details, [], 'internal grading details stay private');
+  assert.equal(res.data.state.examFeedback.base.length, 16);
+  assert.equal(res.data.state.examFeedback.challenge, undefined);
+  assert.equal(res.data.submittedFeedback, undefined);
+  assert.equal(res.data.feedbackSession, undefined);
   res = await f.submit(a, { ...correctBase, ...correctChallenge }, 'challenge-first');
-  assert.equal(res.data.result.baseScore, 0, 'later full submissions cannot replace base first');
+  assert.equal(res.data.result.baseScore, 13, 'later full submissions cannot replace base first');
   assert.equal(res.data.result.passed, false);
   assert.equal(res.data.result.challengeScore, 6);
   assert.equal(res.data.result.challengePassed, true);
-  assert.equal(res.data.state.rewardUnlocked, false);
+  assert.equal(res.data.state.rewardUnlocked, true, 'reward uses the effective first base score, independent of per-goal passing');
   assert.equal(res.data.state.examLatestResult.baseScore, 16);
-  assert.equal(res.data.state.examFirstAnswers.B01, '错误');
-  res = await f.submit(a, { ...correctBase, C01: '错误' }, 'challenge-retry');
+  assert.equal(res.data.state.examFirstAnswers.B01, firstWrong.B01);
+  const wrongChallenge = Object.fromEntries(Object.keys(correctChallenge).map(id => [id, wrongChoice(id)]));
+  res = await f.request('/api/exam/submit', {
+    studentId: a.id, tier: 'challenge', answers: wrongChallenge, eventId: 'challenge-retry',
+  }, a.token);
+  assert.equal(res.status, 200);
   assert.equal(res.data.result.challengeScore, 6);
   assert.equal(res.data.state.examLatestResult.challengeScore, 0);
-  assert.equal(res.data.state.examAnswers.C01, '错误');
+  assert.equal(res.data.state.examAnswers.C01, wrongChallenge.C01);
+  assert.equal(res.data.state.examFeedback.base, undefined, 'reply only reveals the tier just submitted');
   const teacher = (await f.request('/api/teacher')).data.students.find(row => row.student.studentId === a.id);
-  assert.equal(teacher.examFirstResult.baseScore, 0);
+  assert.equal(teacher.examFirstResult.baseScore, 13);
   assert.equal(teacher.examLatestResult.baseScore, 16);
   assert.equal(teacher.challengeFirstResult.challengeScore, 6);
   assert.equal(teacher.examResult.details.filter(row => row.tier === 'challenge' && row.correct).length, 6);
   await f.reopen();
   res = await f.submit(a, correctBase, 'after-reopen');
-  assert.equal(res.data.result.baseScore, 0);
+  assert.equal(res.data.result.baseScore, 13);
   assert.equal(res.data.result.challengeScore, 6);
   assert.equal(f.service.db.prepare('SELECT COUNT(*) AS count FROM events WHERE studentId=?').get(a.id).count, 4);
 });
@@ -213,13 +263,25 @@ test('successful base first remains successful and duplicate exam events do not 
   const a = await f.login();
   await f.ready(a);
   await f.submit(a, correctBase, 'pass-first');
-  let res = await f.submit(a, { B01: '错误', C01: '错误' }, 'retry');
+  let res = await f.submit(a, { ...correctBase, B01: wrongChoice('B01') }, 'retry');
+  assert.equal(res.status, 200);
   assert.equal(res.data.result.baseScore, 16);
   assert.equal(res.data.result.passed, true);
   assert.equal(res.data.state.rewardUnlocked, true);
   assert.equal(res.data.result.challengeScore, 0);
   res = await f.submit(a, { ...correctBase, ...correctChallenge }, 'retry');
   assert.equal(res.data.result.challengeScore, 0);
+  assert.equal(res.data.state.examFeedback.base.length, 16);
+  assert.equal(res.data.state.examFeedback.challenge, undefined);
+  const anotherSession = await f.login();
+  assert.equal(anotherSession.state.examFeedback, undefined);
+  const current = await f.request(`/api/state?studentId=${a.id}`, undefined, anotherSession.token);
+  assert.equal(current.data.state.examFeedback, undefined);
+  const replay = await f.submit(anotherSession, correctBase, 'retry');
+  assert.equal(replay.status, 200);
+  assert.equal(replay.data.state.examFeedback, undefined);
+  assert.equal(replay.data.submittedFeedback, undefined);
+  assert.equal(replay.data.feedbackSession, undefined);
   assert.equal(f.service.db.prepare('SELECT COUNT(*) AS count FROM events WHERE studentId=?').get(a.id).count, 2);
 });
 
@@ -280,6 +342,7 @@ test('static WASM uses its browser MIME type and design or answer sources are no
     assert.equal(question.answer, undefined);
     assert.equal(question.analysis, undefined);
     assert.equal(question.misconceptionMap, undefined);
+    for (const row of question.rows || []) assert.equal(row.answer, undefined);
   }
 });
 
@@ -289,46 +352,71 @@ test('base pass thresholds and independent challenge first results use the agree
     { omit: ['B04', 'B05', 'B10'], baseScore: 13, passed: true, challengeCount: 4, challengePassed: true },
     { omit: ['B04', 'B05', 'B10', 'B07'], baseScore: 12, passed: false, challengeCount: 3, challengePassed: false },
     { omit: ['B01', 'B02', 'B03'], baseScore: 13, g1Score: 2, passed: false, challengeCount: 0, challengePassed: false },
-    { omit: ['B13', 'B14'], baseScore: 14, g2Score: 1, passed: false, challengeCount: 0, challengePassed: false },
-    { omit: ['B01', 'B02', 'B13'], baseScore: 13, g1Score: 3, g2Score: 2, passed: true, challengeCount: 0, challengePassed: false },
+    { omit: ['B13', 'B14'], baseScore: 14, g2Score: 6, passed: true, challengeCount: 0, challengePassed: false },
+    { omit: ['B01', 'B02', 'B13'], baseScore: 13, g1Score: 3, g2Score: 7, passed: true, challengeCount: 0, challengePassed: false },
   ];
   for (let i = 0; i < cases.length; i++) {
     const item = cases[i];
     const student = await f.login(roster[i].id);
     await f.ready(student);
-    const answers = Object.fromEntries(Object.entries(correctBase).filter(([id]) => !item.omit.includes(id)));
-    Object.assign(answers, Object.fromEntries(Object.entries(correctChallenge).slice(0, item.challengeCount)));
+    const answers = Object.fromEntries(Object.entries(correctBase).map(([id, value]) => [id, item.omit.includes(id) ? wrongChoice(id) : value]));
+    const challenge = Object.entries(correctChallenge).map(([id, value], index) => [id, index < item.challengeCount ? value : wrongChoice(id)]);
+    Object.assign(answers, Object.fromEntries(challenge));
     const res = await f.submit(student, answers, `threshold-${i}`);
     assert.equal(res.status, 200);
     for (const key of ['baseScore', 'passed', 'g1Score', 'g2Score', 'challengePassed']) {
       if (item[key] !== undefined) assert.equal(res.data.result[key], item[key], `${i}:${key}`);
     }
     assert.equal(res.data.result.challengeScore, item.challengeCount);
-    assert.equal(res.data.state.rewardUnlocked, item.passed);
+    assert.equal(res.data.state.rewardUnlocked, item.baseScore >= 13);
   }
 });
 
-test('an explicitly submitted empty challenge freezes zero, while base-only submissions do not freeze challenge', async t => {
+test('empty, partial or malformed exams do not freeze a first score or reveal answers', async t => {
   const f = await fixture(t);
   const a = await f.login();
   await f.ready(a);
+  const submit = (tier, answers, eventId) => f.request('/api/exam/submit', {
+    studentId: a.id, tier, answers, eventId,
+  }, a.token);
+  const invalidBase = [
+    [{}, 'EXAM_INCOMPLETE'],
+    [{ ...correctBase, B16: { '等绿灯过街': correctBase.B16['等绿灯过街'] } }, 'EXAM_INCOMPLETE'],
+    [{ ...correctBase, B16: { ...correctBase.B16, fabricated: 'injected' } }, 'EXAM_ANSWER_INVALID'],
+    [{ ...correctBase, B04: { repeatRect: answerScalar(correctBase.B04) } }, 'EXAM_ANSWER_INVALID'],
+  ];
+  for (let i = 0; i < invalidBase.length; i++) {
+    const [answers, code] = invalidBase[i];
+    const result = await submit('base', answers, `bad-base-${i}`);
+    assert.equal(result.status, 400);
+    assert.equal(result.data.code, code);
+    assert.equal(result.data.state, undefined);
+  }
+  const before = (await f.request(`/api/state?studentId=${a.id}`, undefined, a.token)).data.state;
+  assert.equal(before.examFirstResult, null);
+  assert.equal(before.examFeedback, undefined);
+  assert.equal(f.service.db.prepare('SELECT COUNT(*) AS count FROM events').get().count, 0);
   let res = await f.request('/api/exam/submit', {
     studentId: a.id, tier: 'base', answers: { ...correctBase, ...correctChallenge }, eventId: 'base-with-c-keys',
   }, a.token);
   assert.equal(res.status, 200);
   assert.equal(res.data.state.challengeFirstResult, null);
+  assert.equal(res.data.state.examFeedback.challenge, undefined);
   res = await f.request('/api/exam/submit', {
     studentId: a.id, tier: 'challenge', answers: {}, eventId: 'empty-challenge',
   }, a.token);
-  assert.equal(res.status, 200);
-  assert.equal(res.data.state.challengeFirstResult.challengeScore, 0);
+  assert.equal(res.status, 400);
+  assert.equal(res.data.code, 'EXAM_INCOMPLETE');
+  assert.equal(f.service.db.prepare('SELECT COUNT(*) AS count FROM events').get().count, 1);
   res = await f.request('/api/exam/submit', {
     studentId: a.id, tier: 'challenge', answers: { ...correctBase, ...correctChallenge }, eventId: 'challenge-revise',
   }, a.token);
-  assert.equal(res.data.result.challengeScore, 0);
-  assert.equal(res.data.result.challengePassed, false);
+  assert.equal(res.status, 200);
+  assert.equal(res.data.result.challengeScore, 6);
+  assert.equal(res.data.result.challengePassed, true);
   assert.equal(res.data.result.baseScore, 16);
   assert.equal(res.data.state.examLatestResult.challengeScore, 6);
+  assert.equal(res.data.state.examFeedback.challenge.length, 6);
 });
 
 test('explicit challenge requires a prior base first submission and invalid tiers are rejected', async t => {
@@ -374,4 +462,24 @@ test('legacy SQLite histories recover the original first base and challenge inde
   assert.equal(state.challengeFirstAnswers.C01, '挑战首次错误');
   assert.equal(state.examLatestResult.baseScore, 16);
   assert.equal(state.examLatestResult.challengeScore, 6);
+  const early = await f.request('/api/exam/submit', {
+    studentId: a.id, tier: 'challenge', answers: correctChallenge, eventId: 'legacy-before-valid-base',
+  }, a.token);
+  assert.equal(early.status, 409);
+  const base = await f.submit(a, correctBase, 'legacy-replace-base');
+  assert.equal(base.status, 200);
+  assert.equal(base.data.state.examFirstResult.baseScore, 16);
+  assert.equal(base.data.state.legacyIncompleteExam, undefined);
+  const archive = () => JSON.parse(f.service.db.prepare('SELECT json FROM states WHERE studentId=?').get(a.id).json).legacyIncompleteExam;
+  assert.equal(archive().base.result.baseScore, 0);
+  assert.equal(archive().base.answers.B01, '首次错误');
+  const challenge = await f.request('/api/exam/submit', {
+    studentId: a.id, tier: 'challenge', answers: correctChallenge, eventId: 'legacy-replace-challenge',
+  }, a.token);
+  assert.equal(challenge.status, 200);
+  assert.equal(challenge.data.state.challengeFirstResult.challengeScore, 6);
+  assert.equal(challenge.data.state.legacyIncompleteExam, undefined);
+  assert.equal(archive().challenge.result.challengeScore, 0);
+  assert.equal(archive().challenge.answers.C01, '挑战首次错误');
+  assert.equal(f.service.db.prepare('SELECT COUNT(*) AS count FROM events WHERE studentId=?').get(a.id).count, 5);
 });

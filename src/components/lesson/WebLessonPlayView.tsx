@@ -15,7 +15,7 @@ const stories: Record<StoryKey, { image: string; title: string; lines: Array<[st
   s1Success: { image: 'cg_s1_flow_ok.png', title: '引导台稳住了', lines: [ ['阿莲', '接对了，行人按序走。'], ['阿莲', '这块哨给你，引导台稳住了。'] ] },
   s2: { image: 'cg_s2_panel.png', title: '信号拆解台', lines: [ ['阿莲', '信号屏说不清“再等”停在哪。'], ['阿莲', '帮我分清再等还是选路。'] ] },
   s3: { image: 'cg_s3_booth.png', title: '路口调度台', lines: [ ['阿莲', '路口堵了，时长好像设错了。'], ['阿莲', '先运行看堵，再改时长核对。'] ] },
-  exam: { image: 'cg_exam_ready.png', title: '可以去考核了', lines: [ ['阿莲', '时长设对了，路口顺多了。'], ['阿莲', '三站稳住了。可以去考核了。'] ] },
+  exam: { image: 'cg_exam_ready.png', title: '可以去考核了', lines: [ ['阿莲', '这次模拟中，这一侧排队少了，另一侧等得更久。'], ['阿莲', '三站的记录齐了，可以去考核。'] ] },
 };
 
 function knownIntro(props: LessonHostProps) {

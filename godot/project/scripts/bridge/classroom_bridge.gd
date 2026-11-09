@@ -8,6 +8,7 @@ signal exam_closed_from_web
 signal story_replay_request(payload: Dictionary)
 signal flow_result(payload: Dictionary)
 signal relic_synced(remaining: int)
+signal relic_result(success: bool)
 
 var _js_cb_refs: Array = []  # keep JS callbacks alive
 var _ready_posted: bool = false
@@ -63,9 +64,10 @@ func _install_js_bridge() -> void:
 	var cb_replay := JavaScriptBridge.create_callback(_js_replay)
 	var cb_flow := JavaScriptBridge.create_callback(_js_flow)
 	var cb_relic := JavaScriptBridge.create_callback(_js_relic_sync)
+	var cb_relic_result := JavaScriptBridge.create_callback(_js_relic_result)
 	var cb_reset := JavaScriptBridge.create_callback(_js_reset)
 	var cb_focus := JavaScriptBridge.create_callback(_js_focus)
-	_js_cb_refs = [cb_session, cb_unlock, cb_exam_open, cb_exam_closed, cb_replay, cb_flow, cb_relic, cb_reset, cb_focus]
+	_js_cb_refs = [cb_session, cb_unlock, cb_exam_open, cb_exam_closed, cb_replay, cb_flow, cb_relic, cb_relic_result, cb_reset, cb_focus]
 	JavaScriptBridge.eval("window._g5l7Bind = function(name, cb){ window.G5L7Classroom.on(name, function(d){ cb(JSON.stringify(d || {})); }); };", true)
 	var js_window = JavaScriptBridge.get_interface("window")
 	if js_window:
@@ -76,6 +78,7 @@ func _install_js_bridge() -> void:
 		js_window._g5l7Bind("story:replay", cb_replay)
 		js_window._g5l7Bind("flow:result", cb_flow)
 		js_window._g5l7Bind("relic:sync", cb_relic)
+		js_window._g5l7Bind("relic:result", cb_relic_result)
 		js_window._g5l7Bind("station:reset", cb_reset)
 		js_window._g5l7Bind("station:focus", cb_focus)
 	# Also poll getStudent once
@@ -114,6 +117,9 @@ func _js_relic_sync(args: Array) -> void:
 	GameState.relic_used = maxi(0, GameState.relic_quota - rem)
 	GameState.relic_changed.emit()
 	relic_synced.emit(rem)
+
+func _js_relic_result(args: Array) -> void:
+	relic_result.emit(bool(_to_dict(args).get("success", false)))
 
 func _js_reset(args: Array) -> void:
 	var data = _to_dict(args)
