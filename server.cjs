@@ -608,17 +608,68 @@ function createService(options = {}) {
     '.wasm': 'application/wasm',
   };
 
-  function sendFile(res, file, reqMethod) {
-    const ext = path.extname(file);
-    const size = fs.statSync(file).size;
-    res.writeHead(200, {
+  const GZIP_EXTS = new Set(['.wasm', '.js', '.mjs', '.css', '.html', '.json', '.svg']);
+
+  // 分级缓存：文件名带内容哈希的构建产物可长期缓存；
+  // Godot 包与课时图文件名固定，用 1 天 + ETag 协商——同一节课内不重复下载整包，
+  // 重导 Godot 包后也能在下一次协商时及时更新。
+  function cacheControlFor(file) {
+    const rel = path.relative(BASE, file).split(path.sep).join('/');
+    if (/(?:^|\/)assets\//.test(rel)) {
+      if (/-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(rel)) return 'public, max-age=31536000, immutable';
+      return 'public, max-age=86400';
+    }
+    if (/\/(?:godot|lesson)\//.test(rel)) {
+      // Godot 大包体积大、内容随版本固定，可缓存一天；
+      // 但入口脚本与 HTML 会随缺陷修复更新（如 classroom_bridge.js），必须每次协商，
+      // 否则学生继续用缓存里的旧脚本，修复等于没生效。
+      if (/\.(?:js|html)$/i.test(rel)) return 'no-cache';
+      return 'public, max-age=86400';
+    }
+    return 'no-cache';
+  }
+
+  function sendFile(req, res, file, reqMethod) {
+    const ext = path.extname(file).toLowerCase();
+    const stat = fs.statSync(file);
+
+    // 预压缩伴生文件由 tools/precompress.cjs 在构建时生成；
+    // index.wasm 37.7MB 经 gzip 后约 9.7MB，是学生首次进入关卡的主要耗时来源。
+    const gzFile = file + '.gz';
+    let gzSize = 0;
+    if (GZIP_EXTS.has(ext) && /gzip/i.test(req.headers['accept-encoding'] || '')) {
+      try {
+        gzSize = fs.statSync(gzFile).size;
+      } catch {
+        gzSize = 0;
+      }
+    }
+    const useGzip = gzSize > 0;
+    const outFile = useGzip ? gzFile : file;
+    const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}${useGzip ? '-gz' : ''}"`;
+
+    const headers = {
       'Content-Type': mime[ext] || 'application/octet-stream',
-      'Content-Length': size,
-      'Cache-Control': file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=86400' : 'no-cache',
+      'Cache-Control': cacheControlFor(file),
+      'ETag': etag,
+      'Last-Modified': stat.mtime.toUTCString(),
       'X-Content-Type-Options': 'nosniff',
-    });
+    };
+    if (useGzip) {
+      headers['Content-Encoding'] = 'gzip';
+      headers['Vary'] = 'Accept-Encoding';
+    }
+
+    // 协商缓存命中：学生刷新页面或二次进入时不重复传输整包
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, headers);
+      return res.end();
+    }
+
+    headers['Content-Length'] = useGzip ? gzSize : stat.size;
+    res.writeHead(200, headers);
     if (reqMethod === 'HEAD') return res.end();
-    fs.createReadStream(file).pipe(res);
+    fs.createReadStream(outFile).pipe(res);
   }
 
   const server = http.createServer(async (req, res) => {
@@ -938,6 +989,12 @@ function createService(options = {}) {
 
       if (route.startsWith('/api/')) fail(404, '接口不存在');
 
+      // 浏览器自动请求站点图标，返回空响应避免控制台出现 404 干扰排障
+      if (route === '/favicon.ico') {
+        res.writeHead(204, { 'Cache-Control': 'public, max-age=604800' });
+        return res.end();
+      }
+
       if (!['GET', 'HEAD'].includes(req.method)) fail(405, '请求方法不支持');
 
       const distDir = path.join(BASE, 'dist');
@@ -946,7 +1003,7 @@ function createService(options = {}) {
 
       if (spaRoutes.has(route) || route === '/teacher/') {
         const indexFile = path.join(distDir, 'index.html');
-        if (fs.existsSync(indexFile)) return sendFile(res, indexFile, req.method);
+        if (fs.existsSync(indexFile)) return sendFile(req, res, indexFile, req.method);
         // fallback: no build yet
         fail(503, '请先执行 npm run build 再启动课堂服务');
       }
@@ -966,13 +1023,13 @@ function createService(options = {}) {
           fs.statSync(file).isFile() &&
           fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep)
         ) {
-          return sendFile(res, file, req.method);
+          return sendFile(req, res, file, req.method);
         }
       }
 
       // SPA fallback for client-side routes when dist exists
       const indexFile = path.join(distDir, 'index.html');
-      if (fs.existsSync(indexFile) && !path.extname(name)) return sendFile(res, indexFile, req.method);
+      if (fs.existsSync(indexFile) && !path.extname(name)) return sendFile(req, res, indexFile, req.method);
       fail(404, '文件不存在');
     } catch (error) {
       if (!res.headersSent) {
