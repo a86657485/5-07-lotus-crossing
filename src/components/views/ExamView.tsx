@@ -5,7 +5,8 @@ import { apiSubmitExam, type ServerState } from '../../api/client';
 import {
   answerSlots, hasRecordedCompleteTier, isQuestionComplete, sanitizeExamDraft, selectedOption, type ExamAnswers,
 } from '../../utils/examAnswers';
-import QuestionFigure from '../lesson/QuestionFigure';
+import QuestionFigure, { hasQuestionFigure } from '../lesson/QuestionFigure';
+import './examLayout.css';
 
 type Tier = 'base' | 'challenge';
 type Feedback = Partial<Record<Tier, ExamReviewItem[]>>;
@@ -26,7 +27,7 @@ interface ExamViewProps {
 }
 
 const memoryDrafts = new Map<string, ExamAnswers>();
-const optionStyle = 'rounded-xl border p-3 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300';
+const optionStyle = 'exam-option rounded-xl border text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300';
 const navStyle = 'rounded-xl border border-slate-600 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40';
 const taskLabel: Record<string, string> = {
   s1_order: '第一站·观察信号灯',
@@ -37,6 +38,33 @@ const taskLabel: Record<string, string> = {
   e6_ac_optional: '第二站·判断与回边',
 };
 
+/** Station association for recall art only; not shown as an answer cue. */
+const relatedTask: Record<string, string> = {
+  B01: 's1_order',
+  B04: 's2_rewrite', B05: 's2_rewrite', B06: 's2_rewrite', B07: 's2_rewrite', B12: 's2_rewrite', C06: 's2_rewrite',
+  B08: 's2_vs_branch', B09: 's2_vs_branch',
+  B10: 's2_kettle', B11: 's2_kettle', C02: 's2_kettle',
+  B13: 's3_timing', B14: 's3_timing', B15: 's3_timing', C03: 's3_timing',
+  C04: 'e6_ac_optional',
+};
+
+function recallArt(question: QuestionClient): { src: string; alt: string } {
+  const task = relatedTask[question.id] || '';
+  if (task === 's1_order' || task === 's2_rewrite') {
+    return { src: '/lesson/story/cg_s1_queue.png', alt: '行人引导台的开放日路口' };
+  }
+  if (task === 's2_vs_branch' || task === 's2_kettle') {
+    return { src: '/lesson/story/cg_s2_panel.png', alt: '信号拆解台的对照画面' };
+  }
+  if (task === 's3_timing') {
+    return { src: '/lesson/story/cg_s3_booth.png', alt: '路口调度台的工作画面' };
+  }
+  if (question.id === 'B02') {
+    return { src: '/lesson/story/cg_intro_crowd.png', alt: '开放日路口的人群' };
+  }
+  return { src: '/lesson/story/cg_exam_ready.png', alt: '考核前的路口回顾' };
+}
+
 function readDraft(key: string, questions: QuestionClient[]): ExamAnswers {
   if (memoryDrafts.has(key)) return memoryDrafts.get(key) || {};
   try {
@@ -44,6 +72,16 @@ function readDraft(key: string, questions: QuestionClient[]): ExamAnswers {
   } catch {
     return {};
   }
+}
+
+function RecallPanel({ question }: { question: QuestionClient }) {
+  const art = recallArt(question);
+  return (
+    <aside className="exam-recall" aria-label="情景回忆">
+      <img src={art.src} alt={art.alt} data-recall-src={art.src} />
+      <p className="exam-recall-caption">回想这一站</p>
+    </aside>
+  );
 }
 
 function AnswerCards({
@@ -68,7 +106,7 @@ function AnswerCards({
       onDragOver={event => event.preventDefault()}
       onDrop={drop}
       aria-label={slot.label}
-      className={`${optionStyle} min-h-12 min-w-40 border-dashed ${picked ? 'border-cyan-300 bg-cyan-950' : 'border-slate-400 bg-slate-900'}`}
+      className={`${optionStyle} exam-slot ${picked ? 'border-cyan-300 bg-cyan-950' : 'border-slate-400 bg-slate-900'}`}
     >
       {placed || `放入${slot.label}`}
     </button>
@@ -76,26 +114,25 @@ function AnswerCards({
 
   return (
     <>
-      <QuestionFigure question={question} filledAnswer={placed}/>
       {slot && (
-        <div className="my-3 flex flex-wrap items-center gap-2">
+        <div className="exam-slot-row">
           {question.type === 'blocks_assemble' ? (
-            <div aria-label="待拼接积木" className="space-y-1 rounded-2xl border border-blue-600 bg-blue-950 p-3">
-              <div className="rounded-lg bg-amber-300 px-3 py-2 text-sm font-bold text-slate-950">
+            <div aria-label="待拼接积木" className="exam-blocks">
+              <div className="exam-block exam-block-hat">
                 {question.fixedBlocks?.[0] || '当开始被点击'}
               </div>
-              <div className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 font-bold">
+              <div className="exam-block exam-block-loop">
                 重复执行直到 {target}
               </div>
-              <div className="ml-4 rounded-lg bg-cyan-700 px-3 py-2 text-sm">原地观察红绿灯</div>
+              <div className="exam-block exam-block-body">原地观察红绿灯</div>
             </div>
           ) : target}
-          <span className="text-sm text-cyan-100">
+          <span className="exam-slot-hint">
             {picked ? `已拿起「${picked}」，点槽位放入。` : '拖入虚线槽位，或先点卡片再点槽位。'}
           </span>
         </div>
       )}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className={`exam-options exam-options-${(question.options || question.cards || []).length}`}>
         {(question.options || question.cards || []).map(option => {
           const selected = slot ? picked === option : placed === option;
           return <button
@@ -155,6 +192,8 @@ export const ExamView: React.FC<ExamViewProps> = ({
   const incomplete = currentQuestions.filter(q => !isQuestionComplete(q, answers[q.id]));
   const currentComplete = isQuestionComplete(question, answers[question.id]);
   const review = feedback[tier]?.find(item => item.questionId === question.id);
+  const showFigure = hasQuestionFigure(question);
+  const placed = selectedOption(question, answers[question.id]);
 
   useEffect(() => { stem.current?.focus({ preventScroll: true }); }, [tier, index]);
 
@@ -223,117 +262,130 @@ export const ExamView: React.FC<ExamViewProps> = ({
     : '本层题目已答完整，可以提交。';
 
   return (
-    <main className="min-h-screen bg-slate-900 p-4 text-slate-100">
-      <fieldset disabled={submitting} className="mx-auto max-w-6xl space-y-4">
+    <main className="exam-shell" data-exam-layout="fill">
+      <fieldset disabled={submitting} className="exam-fieldset">
         <legend className="sr-only">课堂综合检测</legend>
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-700 bg-slate-800 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={onBackToMap} className={navStyle}>← 返回路口</button>
-            <h1 className="font-bold text-amber-300">临时小交警 · 课堂综合检测</h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" aria-pressed={tier === 'base'} onClick={() => switchTier('base')} className={navStyle}>
-              基础关（共 {base.length} 题）
-            </button>
-            <button type="button" aria-pressed={tier === 'challenge'} disabled={!baseComplete}
-              onClick={() => switchTier('challenge')} className={navStyle}>
-              {baseComplete ? `挑战关（共 ${challenge.length} 题）` : '挑战关（完整提交基础关后解锁）'}
-            </button>
-          </div>
-        </header>
-        {(submitError || submitting || storageIssue) && (
-          <div role={submitError ? 'alert' : 'status'} className="rounded-xl border border-amber-500 bg-slate-800 p-3 text-sm">
-            {submitError || (submitting ? '正在提交答卷…' : '此浏览器无法长期暂存草稿。请在关闭或刷新页面前提交。')}
-          </div>
-        )}
-        {first && (
-          <aside className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-600 bg-slate-800 p-4 text-sm">
-            <div className="grow">
-              <p className="font-bold">
-                {baseComplete ? '基础层首次得分' : '旧版不完整基础记录'}：{first.baseScore} / {first.baseTotal}
-                {latest && baseComplete && <span className="ml-3 text-slate-300">最近一次：{latest.baseScore} / {latest.baseTotal}</span>}
-              </p>
-              {!baseComplete && <p className="text-amber-200">旧记录已保留。下一份完整答卷将成为有效基础首答。</p>}
-              {baseComplete && <p className="text-slate-300">{first.passed ? '基础层已达标。' : '基础首答已保存。挑战加分不改变基础达标结果。'}</p>}
-              {challengeComplete && <p className="text-purple-200">挑战首答：{first.challengeScore} / {first.challengeTotal}</p>}
-              {initialChallengeSubmitted && !challengeComplete && <p className="text-amber-200">旧版挑战记录未答完整。下一份完整挑战卷将成为有效挑战首答。</p>}
+        <div className="exam-frame">
+          <header className="exam-header">
+            <div className="exam-header-left">
+              <button type="button" onClick={onBackToMap} className={navStyle}>← 返回路口</button>
+              <h1>临时小交警 · 课堂综合检测</h1>
             </div>
-            {baseComplete && <button type="button" onClick={() => switchTier('challenge')} className={navStyle}>进入挑战关 →</button>}
-            {rewardUnlocked && baseComplete && onOpenRewardGame && <button type="button" onClick={onOpenRewardGame}
-              className="rounded-xl bg-emerald-400 px-4 py-2 font-bold text-slate-950">进入奖励小游戏</button>}
-          </aside>
-        )}
-
-        <section className="space-y-4 rounded-3xl border border-slate-700 bg-slate-800/60 p-4 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 pb-3">
-            <p className="text-sm">第 {index + 1} 题 / 共 {currentQuestions.length} 题 · 题号：{question.id} · 已答完整 {totalAnswered} 题</p>
-            <nav aria-label="题号跳转" className="flex flex-wrap gap-1">
-              {currentQuestions.map((q, i) => {
-                const complete = isQuestionComplete(q, answers[q.id]);
-                return <button key={q.id} type="button" data-answered={complete} aria-current={i === index ? 'step' : undefined}
-                  title={complete ? '已答完整' : '未答完整'} onClick={() => setIndex(i)}
-                  className={`min-h-9 min-w-9 rounded-lg border text-sm ${i === index ? 'border-amber-300 bg-amber-400 text-slate-950' : complete ? 'border-emerald-500 text-emerald-300' : 'border-slate-600 text-slate-300'}`}
-                >{i + 1}</button>;
-              })}
-            </nav>
-          </div>
-          <h2 ref={stem} tabIndex={-1} className="text-lg font-bold focus:outline-none">{question.stem}</h2>
-          <p role="status" className="text-sm text-cyan-100">{nextAction}</p>
-          <div className={`space-y-3 rounded-2xl p-2 ${!currentComplete ? 'outline outline-1 outline-cyan-800' : ''}`}>
-            {question.platform && <p className="text-sm text-sky-200">平台：{question.platform}</p>}
-            {question.type !== 'matching' ? (
-              <AnswerCards key={question.id} question={question} answer={answers[question.id]} onSelect={select}/>
-            ) : (
-              question.rows?.map(row => {
-                const value = answers[question.id];
-                const chosen = value && typeof value === 'object' ? value[row.prompt] : undefined;
-                return (
-                  <fieldset key={row.prompt} className="space-y-2 rounded-xl border border-slate-700 p-3">
-                    <legend className="px-2 text-sm font-bold text-amber-200">{row.prompt}</legend>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      {row.choices.map(choice => (
-                        <button key={choice} type="button" aria-pressed={chosen === choice}
-                          onClick={() => select({ ...(typeof value === 'object' ? value : {}), [row.prompt]: choice })}
-                          className={`${optionStyle} ${chosen === choice ? 'border-amber-300 bg-amber-500/20' : 'border-slate-600 bg-slate-800'}`}
-                        >{choice}</button>
-                      ))}
-                    </div>
-                  </fieldset>
-                );
-              })
-            )}
-          </div>
-          {feedbackAvailable && (
-            <button type="button" aria-expanded={showReview} onClick={() => setShowReview(open => !open)} className={navStyle}>
-              {showReview ? '收起上次答卷反馈' : '查看上次答卷反馈'}
-            </button>
+            <div className="exam-header-tiers">
+              <button type="button" aria-pressed={tier === 'base'} onClick={() => switchTier('base')} className={navStyle}>
+                基础关（共 {base.length} 题）
+              </button>
+              <button type="button" aria-pressed={tier === 'challenge'} disabled={!baseComplete}
+                onClick={() => switchTier('challenge')} className={navStyle}>
+                {baseComplete ? `挑战关（共 ${challenge.length} 题）` : '挑战关（完整提交基础关后解锁）'}
+              </button>
+            </div>
+          </header>
+          {(submitError || submitting || storageIssue) && (
+            <div role={submitError ? 'alert' : 'status'} className="exam-alert">
+              {submitError || (submitting ? '正在提交答卷…' : '此浏览器无法长期暂存草稿。请在关闭或刷新页面前提交。')}
+            </div>
           )}
-          {showReview && review && (
-            <aside className="space-y-2 rounded-xl border border-sky-700 bg-slate-900 p-4 text-sm" aria-label="上次答卷反馈">
-              <p className={review.correct ? 'font-bold text-emerald-300' : 'font-bold text-amber-300'}>
-                上次提交：{review.correct ? '答对了' : '需要修订'}
-              </p>
-              <p>你上次选择：{answerText(review.submittedAnswer, question)}</p>
-              <p>参考答案：{answerText(review.correctAnswer, question)}</p>
-              <p>{review.analysis}</p>
-              {!review.correct && <button type="button" onClick={onBackToMap} className={navStyle}>
-                返回路口回学{review.relatedTaskId && taskLabel[review.relatedTaskId] ? ` · ${taskLabel[review.relatedTaskId]}` : ''}
-              </button>}
+          {first && (
+            <aside className="exam-score">
+              <div className="exam-score-copy">
+                <p className="font-bold">
+                  {baseComplete ? '基础层首次得分' : '旧版不完整基础记录'}：{first.baseScore} / {first.baseTotal}
+                  {latest && baseComplete && <span className="ml-3 text-slate-300">最近一次：{latest.baseScore} / {latest.baseTotal}</span>}
+                </p>
+                {!baseComplete && <p className="text-amber-200">旧记录已保留。下一份完整答卷将成为有效基础首答。</p>}
+                {baseComplete && <p className="text-slate-300">{first.passed ? '基础层已达标。' : '基础首答已保存。挑战加分不改变基础达标结果。'}</p>}
+                {challengeComplete && <p className="text-purple-200">挑战首答：{first.challengeScore} / {first.challengeTotal}</p>}
+                {initialChallengeSubmitted && !challengeComplete && <p className="text-amber-200">旧版挑战记录未答完整。下一份完整挑战卷将成为有效挑战首答。</p>}
+              </div>
+              {baseComplete && <button type="button" onClick={() => switchTier('challenge')} className={navStyle}>进入挑战关 →</button>}
+              {rewardUnlocked && baseComplete && onOpenRewardGame && <button type="button" onClick={onOpenRewardGame}
+                className="rounded-xl bg-emerald-400 px-4 py-2 font-bold text-slate-950">进入奖励小游戏</button>}
             </aside>
           )}
-          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 pt-4">
-            <button type="button" disabled={index === 0} onClick={() => setIndex(i => i - 1)} className={navStyle}>← 上一题</button>
-            {index < currentQuestions.length - 1 ? (
-              <button type="button" onClick={() => setIndex(i => i + 1)}
-                className={`${navStyle} ${currentComplete ? 'border-cyan-300 bg-cyan-950' : ''}`}>下一题 →</button>
-            ) : (
-              <button type="button" onClick={() => void submit()}
-                className={`${navStyle} ${incomplete.length ? 'bg-slate-700' : 'bg-amber-400 font-bold text-slate-950'}`}>
-                {tier === 'base' ? (baseComplete ? '重新提交基础关' : `提交基础关答卷 (${base.length}题) →`) : '提交挑战加分答卷 →'}
+
+          <section className="exam-stage" data-exam-question={question.id} data-exam-visual={showFigure ? 'figure' : 'recall'}>
+            <div className="exam-meta">
+              <p>第 {index + 1} 题 / 共 {currentQuestions.length} 题 · 题号：{question.id} · 已答完整 {totalAnswered} 题</p>
+              <nav aria-label="题号跳转" className="exam-qnav">
+                {currentQuestions.map((q, i) => {
+                  const complete = isQuestionComplete(q, answers[q.id]);
+                  return <button key={q.id} type="button" data-answered={complete} aria-current={i === index ? 'step' : undefined}
+                    title={complete ? '已答完整' : '未答完整'} onClick={() => setIndex(i)}
+                    className={`min-h-9 min-w-9 rounded-lg border text-sm ${i === index ? 'border-amber-300 bg-amber-400 text-slate-950' : complete ? 'border-emerald-500 text-emerald-300' : 'border-slate-600 text-slate-300'}`}
+                  >{i + 1}</button>;
+                })}
+              </nav>
+            </div>
+            <div className={`exam-workspace ${showFigure ? 'has-figure' : 'has-recall'} ${question.id === 'B08' || question.id === 'C02' ? 'has-double' : ''}`}>
+              <div className="exam-visual">
+                {showFigure
+                  ? <QuestionFigure key={question.id} question={question} filledAnswer={placed} />
+                  : <RecallPanel key={question.id} question={question} />}
+              </div>
+              <div className="exam-prompt">
+                <h2 ref={stem} tabIndex={-1} className="exam-stem">{question.stem}</h2>
+                <p role="status" className="exam-status">{nextAction}</p>
+                <div className={`exam-answers ${!currentComplete ? 'is-incomplete' : ''}`}>
+                  {question.platform && <p className="exam-platform">平台：{question.platform}</p>}
+                  {question.type !== 'matching' ? (
+                    <AnswerCards key={question.id} question={question} answer={answers[question.id]} onSelect={select}/>
+                  ) : (
+                    <div className="exam-match">
+                      {question.rows?.map(row => {
+                        const value = answers[question.id];
+                        const chosen = value && typeof value === 'object' ? value[row.prompt] : undefined;
+                        return (
+                          <fieldset key={row.prompt} className="exam-match-row">
+                            <legend>{row.prompt}</legend>
+                            <div className="exam-match-choices">
+                              {row.choices.map(choice => (
+                                <button key={choice} type="button" aria-pressed={chosen === choice}
+                                  onClick={() => select({ ...(typeof value === 'object' ? value : {}), [row.prompt]: choice })}
+                                  className={`${optionStyle} ${chosen === choice ? 'border-amber-300 bg-amber-500/20' : 'border-slate-600 bg-slate-800'}`}
+                                >{choice}</button>
+                              ))}
+                            </div>
+                          </fieldset>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {feedbackAvailable && (
+              <button type="button" aria-expanded={showReview} onClick={() => setShowReview(open => !open)} className={navStyle}>
+                {showReview ? '收起上次答卷反馈' : '查看上次答卷反馈'}
               </button>
             )}
-          </footer>
-        </section>
+            {showReview && review && (
+              <aside className="exam-review" aria-label="上次答卷反馈">
+                <p className={review.correct ? 'font-bold text-emerald-300' : 'font-bold text-amber-300'}>
+                  上次提交：{review.correct ? '答对了' : '需要修订'}
+                </p>
+                <p>你上次选择：{answerText(review.submittedAnswer, question)}</p>
+                <p>参考答案：{answerText(review.correctAnswer, question)}</p>
+                <p>{review.analysis}</p>
+                {!review.correct && <button type="button" onClick={onBackToMap} className={navStyle}>
+                  返回路口回学{review.relatedTaskId && taskLabel[review.relatedTaskId] ? ` · ${taskLabel[review.relatedTaskId]}` : ''}
+                </button>}
+              </aside>
+            )}
+            <footer className="exam-footer">
+              <button type="button" disabled={index === 0} onClick={() => setIndex(i => i - 1)} className={navStyle}>← 上一题</button>
+              {index < currentQuestions.length - 1 ? (
+                <button type="button" onClick={() => setIndex(i => i + 1)}
+                  className={`${navStyle} ${currentComplete ? 'border-cyan-300 bg-cyan-950' : ''}`}>下一题 →</button>
+              ) : (
+                <button type="button" onClick={() => void submit()}
+                  className={`${navStyle} ${incomplete.length ? 'bg-slate-700' : 'bg-amber-400 font-bold text-slate-950'}`}>
+                  {tier === 'base' ? (baseComplete ? '重新提交基础关' : `提交基础关答卷 (${base.length}题) →`) : '提交挑战加分答卷 →'}
+                </button>
+              )}
+            </footer>
+          </section>
+        </div>
       </fieldset>
     </main>
   );
