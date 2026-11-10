@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExamEvaluationResult, LearningEvidence } from '../../types';
 import { apiSetClassExamPaused, apiTeacher, teacherExportUrl, type TeacherPayload } from '../../api/client';
+import { RewardLeaderboard } from './RewardLeaderboard';
 
 type Pupil = TeacherPayload['students'][number];
 type SortField = 'classId' | 'name' | 'lastSync' | 'first' | 'latest' | 'support';
@@ -320,6 +321,8 @@ export const TeacherDashboardView: React.FC<{ onBackToApp?: () => void }> = ({ o
         {operationMessage && <span className="text-sm" role="status">{operationMessage}</span>}
       </div>
     </section>
+
+    {(payload || loading) && <RewardLeaderboard entries={payload?.rewardLeaderboard ?? []} selectedClass={selectedClass} pending={!payload} />}
 
     <section className={panel} aria-label="筛选结果图表">
       <h2 className="text-sm font-semibold mb-2">筛选结果 · {rows.length} 人</h2>

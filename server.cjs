@@ -10,6 +10,7 @@ const crypto = require('node:crypto');
 const { isIP } = require('node:net');
 const { DatabaseSync } = require('node:sqlite');
 const { BANK, evaluateAnswers, hasCompleteRecordedAnswers, QUIZ_VERSION } = require('./quiz.cjs');
+const TRAIN_ORDERS = require('./train-orders.json');
 
 const BASE = __dirname;
 const CLASSES = ['501', '502', '503', '504'];
@@ -62,6 +63,24 @@ function publicStudentPayload(payload, feedback) {
 
 function fail(status, message, code) {
   throw Object.assign(new Error(message), { status, code });
+}
+
+function verifiedTrainLaps({ orderIndex, rule, route }) {
+  const order = Number.isInteger(orderIndex) && TRAIN_ORDERS[orderIndex];
+  if (!order || !['three', 'fulfilled'].includes(rule) || !Array.isArray(route) ||
+      route.length < 1 || route.length > 24 || route.some(lane => lane !== 'water' && lane !== 'tools')) {
+    fail(400, '小游戏路线格式不正确');
+  }
+  if (rule === 'three' && route.length !== 3) fail(400, '固定圈数规则须在第三圈回库');
+  const cargo = { water: 0, tools: 0 };
+  for (const [index, lane] of route.entries()) {
+    if (cargo[lane] < order[lane]) cargo[lane]++;
+    if (rule === 'fulfilled' && cargo.water === order.water && cargo.tools === order.tools && index + 1 < route.length) {
+      fail(400, '订单装齐时就应回库');
+    }
+  }
+  if (cargo.water !== order.water || cargo.tools !== order.tools) fail(400, '订单尚未装齐，无法计入排行榜');
+  return route.length;
 }
 
 function isPrivateAddress(address) {
@@ -166,7 +185,20 @@ function createService(options = {}) {
     CREATE TABLE IF NOT EXISTS events(studentId TEXT NOT NULL, eventId TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(studentId, eventId));
     CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, studentId TEXT NOT NULL, createdAt TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS evidence(studentId TEXT NOT NULL, eventId TEXT NOT NULL, json TEXT NOT NULL, createdAt TEXT NOT NULL, PRIMARY KEY(studentId, eventId));
-    CREATE TABLE IF NOT EXISTS class_exam_pauses(classId TEXT PRIMARY KEY);`);
+    CREATE TABLE IF NOT EXISTS class_exam_pauses(classId TEXT PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS train_reward_scores(
+      studentId TEXT NOT NULL, orderIndex INTEGER NOT NULL, bestLaps INTEGER NOT NULL,
+      PRIMARY KEY(studentId, orderIndex)
+    );`);
+
+  const improveTrainScore = db.prepare(`
+    INSERT INTO train_reward_scores(studentId, orderIndex, bestLaps) VALUES(?, ?, ?)
+    ON CONFLICT(studentId, orderIndex) DO UPDATE SET bestLaps=excluded.bestLaps
+    WHERE excluded.bestLaps < train_reward_scores.bestLaps
+    RETURNING bestLaps
+  `);
+  const readTrainScore = db.prepare('SELECT bestLaps FROM train_reward_scores WHERE studentId=? AND orderIndex=?');
+  const readTrainScores = db.prepare('SELECT studentId, orderIndex, bestLaps FROM train_reward_scores ORDER BY orderIndex');
 
   function isClassExamPaused(classId) {
     return !!db.prepare('SELECT 1 FROM class_exam_pauses WHERE classId=?').get(classId);
@@ -412,6 +444,25 @@ function createService(options = {}) {
         };
       });
 
+    const byStudent = new Map(students.map(({ student }) => [student.studentId, student]));
+    const ranked = new Map();
+    for (const { studentId, orderIndex, bestLaps } of readTrainScores.all()) {
+      const student = byStudent.get(studentId);
+      const order = TRAIN_ORDERS[orderIndex];
+      if (!student || !order) continue;
+      if (!ranked.has(studentId)) {
+        ranked.set(studentId, {
+          studentId, name: student.name, classId: student.classId, completedOrders: 0, totalExtraLaps: 0, orders: [],
+        });
+      }
+      const entry = ranked.get(studentId);
+      entry.completedOrders++;
+      entry.totalExtraLaps += bestLaps - order.water - order.tools;
+      entry.orders.push({ orderIndex, bestLaps });
+    }
+    const rewardLeaderboard = [...ranked.values()].sort((a, b) => b.completedOrders - a.completedOrders ||
+      a.totalExtraLaps - b.totalExtraLaps || a.studentId.localeCompare(b.studentId));
+
     const rosterStudents = students.filter((row) => rosterIds.has(row.student.studentId));
     const rosterTotal = rosterStudents.length;
     const entered = rosterStudents.filter((s) => s.entered).length;
@@ -436,6 +487,7 @@ function createService(options = {}) {
       ),
       classes: classes(),
       students,
+      rewardLeaderboard,
       summary: {
         total: rosterTotal,
         entered,
@@ -705,6 +757,16 @@ function createService(options = {}) {
           return save(student.id, state);
         });
         return json(res, 200, clientPayload({ student: toClientStudent(student), state: saved }));
+      }
+
+      if (req.method === 'POST' && route === '/api/reward/train/result') {
+        const body = await readBody(req);
+        const student = studentGuard(req, body.studentId);
+        if (!recordFor(student.id).state?.rewardUnlocked) fail(409, '请先达到奖励小游戏的解锁条件');
+        const laps = verifiedTrainLaps(body);
+        const score = improveTrainScore.get(student.id, body.orderIndex, laps) ||
+          readTrainScore.get(student.id, body.orderIndex);
+        return json(res, 200, score);
       }
 
       if (req.method === 'POST' && route === '/api/evidence') {

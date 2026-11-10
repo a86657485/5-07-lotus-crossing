@@ -1,20 +1,21 @@
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import {
   ArrowLeft, Check, ChevronRight, CircleHelp, Droplets, Flag, Gauge, GitFork,
   LockKeyhole, Package, Play, Repeat2, RotateCcw, TrainFront, Wrench, X,
 } from 'lucide-react';
 import {
-  createTrainRound, TRAIN_ORDERS, trainRoundReducer,
-  type CargoKind, type TrainAction, type TrainOrderIndex, type TrainRound, type TrainRule,
+  createTrainRound, TRAIN_LAP_LIMIT, TRAIN_ORDER_INDICES, TRAIN_ORDERS, trainRoundReducer,
+  type CargoKind, type TrainAction, type TrainOrderIndex, type TrainResultInput, type TrainRound, type TrainRule,
 } from '../../lesson/trainReward';
 import { TrainRewardScene } from './TrainRewardScene';
 import './trainReward.css';
 
 interface RewardLoopGameProps {
   onBackToMap: () => void;
+  onRecordResult: (input: TrainResultInput) => Promise<{ bestLaps: number }>;
 }
 
-const ORDER_NAMES = ['公园补给', '工坊补给'] as const;
+const ORDER_NUMBERS = ['一', '二', '三', '四', '五'] as const;
 const CARGO = {
   water: { name: '水', station: '水站', Icon: Droplets },
   tools: { name: '工具', station: '工具站', Icon: Wrench },
@@ -26,15 +27,20 @@ const RULES = [
 ] as const;
 
 const PHASE_TIMING = {
-  approach: { normal: 3000, fast: 1900, next: 'lock' },
   locked: { normal: 780, fast: 550, next: 'load' },
   loading: { normal: 1000, fast: 760, next: 'check' },
   checking: { normal: 1700, fast: 1250, next: 'continue' },
   depot: { normal: 950, fast: 720, next: 'finish' },
 } as const;
 
+const SWITCH_WINDOWS = {
+  normal: [3000, 3000, 2700, 2400, 2100],
+  fast: [1900, 1900, 1700, 1600, 1400],
+} as const;
+
 type Speed = 'normal' | 'fast';
 type RewardAction = TrainAction | { type: 'setup'; orderIndex: TrainOrderIndex; rule: TrainRule };
+type RecordStatus = { status: 'idle' | 'saving' | 'failed' } | { status: 'saved'; bestLaps: number };
 
 function rewardReducer(round: TrainRound, action: RewardAction) {
   return action.type === 'setup'
@@ -46,20 +52,21 @@ function useTrainProgress(
   phase: TrainRound['phase'],
   completedRounds: number,
   speed: Speed,
+  switchWindow: number,
   paused: boolean,
   dispatch: (action: TrainAction) => void,
 ) {
   const key = phase + completedRounds;
   const clock = useRef({ key, elapsed: 0 });
   const [frame, setFrame] = useState({ key, progress: 0 });
-  const timing = phase === 'ready' || phase === 'done' ? null : PHASE_TIMING[phase];
+  const timing = phase === 'ready' || phase === 'approach' || phase === 'done' ? null : PHASE_TIMING[phase];
+  const duration = phase === 'approach' ? switchWindow : timing?.[speed];
+  const next = phase === 'approach' ? 'lock' : timing?.next;
 
   useLayoutEffect(() => {
     if (clock.current.key !== key) clock.current = { key, elapsed: 0 };
-    if (paused || !timing) return;
+    if (paused || !duration || !next) return;
 
-    const duration = timing[speed];
-    const next = timing.next;
     let frameId = 0;
     let previousTime: number | undefined;
     let lastPaint = 0;
@@ -79,7 +86,7 @@ function useTrainProgress(
     }
     frameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameId);
-  }, [key, paused, timing, speed, dispatch]);
+  }, [key, paused, duration, next, dispatch]);
 
   return frame.key === key ? frame.progress : 0;
 }
@@ -122,25 +129,28 @@ function CargoMeter({ kind, count, target }: { kind: CargoKind; count: number; t
   );
 }
 
-export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
+export function RewardLoopGame({ onBackToMap, onRecordResult }: RewardLoopGameProps) {
   const [round, dispatch] = useReducer(rewardReducer, undefined, () => createTrainRound(0, 'three'));
   const [speed, setSpeed] = useState<Speed>('normal');
   const [helpOpen, setHelpOpen] = useState(false);
   const [lateLap, setLateLap] = useState<number | null>(null);
+  const [recordStatus, setRecordStatus] = useState<RecordStatus>({ status: 'idle' });
+  const recordInFlight = useRef(false);
   const switchButton = useRef<HTMLButtonElement>(null);
   const helpButton = useRef<HTMLButtonElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const startButton = useRef<HTMLButtonElement>(null);
   const helpDialog = useRef<HTMLDialogElement>(null);
-  const { phase, cargo, order, rule, lane, completedRounds, lastLoad, result } = round;
+  const { phase, cargo, order, orderIndex, rule, route, lane, completedRounds, lastLoad, result } = round;
   const isReady = phase === 'ready';
   const isDone = phase === 'done';
   const switchOpen = phase === 'approach';
-  const progress = useTrainProgress(phase, completedRounds, speed, helpOpen, dispatch);
+  const switchWindow = SWITCH_WINDOWS[speed][orderIndex];
+  const progress = useTrainProgress(phase, completedRounds, speed, switchWindow, helpOpen, dispatch);
   const scene = getScene(round, progress);
   const currentRule = RULES[rule === 'three' ? 0 : 1];
   const lap = phase === 'checking' || phase === 'depot' || isDone ? completedRounds : completedRounds + 1;
-  const remainingSeconds = Math.max(1, Math.ceil((1 - progress) * PHASE_TIMING.approach[speed] / 1000));
+  const remainingSeconds = Math.max(0.1, Math.ceil((1 - progress) * switchWindow / 100) / 10);
   const leavingCheck = phase === 'checking' && progress >= 0.58;
   const step = phase === 'ready' ? -1
     : phase === 'approach' || phase === 'locked' ? 0
@@ -148,6 +158,27 @@ export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
     : phase === 'checking' && !leavingCheck ? 2
     : 3;
   const nextStep = result ? '回库' : leavingCheck ? '再跑一圈' : '再跑或回库';
+  const minimumLaps = order.water + order.tools;
+  const reachedLapLimit = result === 'short' && rule === 'fulfilled';
+  const waitingForReceipt = result === 'filled' && (recordStatus.status === 'idle' || recordStatus.status === 'saving');
+
+  const saveResult = useCallback(async () => {
+    if (recordInFlight.current) return;
+    recordInFlight.current = true;
+    setRecordStatus({ status: 'saving' });
+    try {
+      const { bestLaps } = await onRecordResult({ orderIndex, rule, route });
+      setRecordStatus({ status: 'saved', bestLaps });
+    } catch {
+      setRecordStatus({ status: 'failed' });
+    } finally {
+      recordInFlight.current = false;
+    }
+  }, [onRecordResult, orderIndex, rule, route]);
+
+  useEffect(() => {
+    if (isDone && result === 'filled' && recordStatus.status === 'idle') void saveResult();
+  }, [isDone, result, recordStatus.status, saveResult]);
 
   useEffect(() => {
     if (phase === 'approach' && completedRounds === 0) switchButton.current?.focus();
@@ -157,6 +188,7 @@ export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
   function setup(orderIndex: TrainOrderIndex, nextRule: TrainRule) {
     dispatch({ type: 'setup', orderIndex, rule: nextRule });
     setLateLap(null);
+    setRecordStatus({ status: 'idle' });
     if (isDone) requestAnimationFrame(() => startButton.current?.focus());
   }
 
@@ -195,10 +227,11 @@ export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
       : `第 ${completedRounds} 圈 · 核对订单`;
     statusDetail = rule === 'three'
       ? `已跑 ${completedRounds} / 3 圈${result ? '，按规则回库。' : '，继续跑。'}`
+      : reachedLapLimit ? `跑到本趟的 ${TRAIN_LAP_LIMIT} 圈上限，先回库再试。`
       : result ? '两种物资都已装齐，可以回库。' : '订单还没装齐，继续跑。';
   } else if (phase === 'depot') {
     statusTitle = '正在回库';
-    statusDetail = result === 'filled' ? '订单装齐了，准备卸货。' : '跑够 3 圈，回库清点剩余物资。';
+    statusDetail = result === 'filled' ? '订单装齐了，准备卸货。' : '回库清点还缺的物资。';
   } else if (isDone) {
     statusTitle = '小火车已到库';
     statusDetail = '这一趟结束了，可以再试一张订单。';
@@ -229,20 +262,20 @@ export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
               <>
                 <fieldset className="train-card train-choice">
                   <legend><span>1</span> 选一张订单</legend>
-                  <div className="train-choice-options">
-                    {TRAIN_ORDERS.map((item, index) => (
-                      <label key={ORDER_NAMES[index]} className="train-option" data-selected={round.orderIndex === index}>
-                        <input type="radio" name="train-order" checked={round.orderIndex === index} onChange={() => setup(index === 0 ? 0 : 1, rule)} />
-                        <span className="train-option-copy">
-                          <strong>{ORDER_NAMES[index]}</strong>
-                          <small className="train-order-contents">
-                            <span><Droplets size={14} aria-hidden="true" /> 水 {item.water} 箱</span>
-                            <span><Wrench size={14} aria-hidden="true" /> 工具 {item.tools} 箱</span>
-                          </small>
-                        </span>
-                        <span className="train-selection" aria-hidden="true">{round.orderIndex === index && <Check size={13} />}</span>
+                  <div className="train-order-options">
+                    {TRAIN_ORDER_INDICES.map(index => (
+                      <label key={index} className="train-order-option" data-selected={orderIndex === index}>
+                        <input type="radio" name="train-order" aria-label={`订单${ORDER_NUMBERS[index]} · ${TRAIN_ORDERS[index].name}`} checked={orderIndex === index} onChange={() => setup(index, rule)} />
+                        <span aria-hidden="true">{index + 1}</span>
                       </label>
                     ))}
+                  </div>
+                  <div className="train-option-copy train-order-preview" aria-live="polite">
+                    <strong>订单{ORDER_NUMBERS[orderIndex]} · {order.name}</strong>
+                    <small className="train-order-contents">
+                      <span><Droplets size={14} aria-hidden="true" /> 水 {order.water} 箱</span>
+                      <span><Wrench size={14} aria-hidden="true" /> 工具 {order.tools} 箱</span>
+                    </small>
                   </div>
                 </fieldset>
 
@@ -273,14 +306,14 @@ export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
 
                 <div className="train-tip">
                   <CircleHelp size={17} aria-hidden="true" />
-                  <p>每圈只去一个站，最多装一箱。<br />小火车过岔口前，点道岔就能换站。</p>
+                  <p>每圈只去一个站，最多装一箱。本单每圈可换道 <strong>{switchWindow / 1000} 秒</strong>。</p>
                 </div>
               </>
             ) : (
               <>
                 <section className="train-card train-manifest" aria-label="当前订单">
-                  <p className="train-eyebrow"><Package size={17} aria-hidden="true" /> 当前订单</p>
-                  <h2>{ORDER_NAMES[round.orderIndex]}</h2>
+                  <p className="train-eyebrow"><Package size={17} aria-hidden="true" /> 订单{ORDER_NUMBERS[orderIndex]}</p>
+                  <h2>{order.name}</h2>
                   <div className="train-cargo-list">
                     {CARGO_KINDS.map((kind) => (
                       <CargoMeter key={kind} kind={kind} count={cargo[kind]} target={order[kind]} />
@@ -296,16 +329,25 @@ export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
                     <p>
                       {result === 'filled'
                         ? `这趟跑了 ${completedRounds} 圈，水和工具都装齐了。`
-                        : `固定跑了 3 圈。还差 ${CARGO_KINDS.filter((kind) => cargo[kind] < order[kind])
+                        : `${reachedLapLimit ? `跑到本趟的 ${TRAIN_LAP_LIMIT} 圈上限。` : '固定跑了 3 圈。'}还差 ${CARGO_KINDS.filter((kind) => cargo[kind] < order[kind])
                           .map((kind) => `${order[kind] - cargo[kind]} 箱${CARGO[kind].name}`).join('、')}。`}
                     </p>
-                    {result === 'short' && round.orderIndex === 1 && <p>工坊要 4 箱物资，每圈最多装 1 箱。</p>}
+                    {result === 'short' && rule === 'three' && minimumLaps > 3 && <p>这张订单要 {minimumLaps} 箱物资，每圈最多装 1 箱。</p>}
+                    {result === 'filled' && <p className="train-record-status" data-status={recordStatus.status} role="status">
+                      {recordStatus.status === 'saved' ? `已记入排行榜。本单最佳 ${recordStatus.bestLaps} 圈。`
+                        : recordStatus.status === 'failed' ? '成绩暂未确认。你可以重试。'
+                        : '正在同步成绩…'}
+                    </p>}
                     <div className="train-outcome-actions">
-                      <button type="button" className="train-quiet-button" onClick={() => setup(round.orderIndex, rule)}>
+                      {recordStatus.status === 'failed' && (
+                        <button type="button" className="train-next-button" onClick={() => void saveResult()}>重试同步</button>
+                      )}
+                      <button type="button" className="train-quiet-button" disabled={waitingForReceipt} onClick={() => setup(orderIndex, rule)}>
                         <RotateCcw size={16} aria-hidden="true" /> 原订单再玩
                       </button>
-                      <button type="button" className="train-next-button" onClick={() => setup(round.orderIndex === 0 ? 1 : 0, rule)}>
-                        换一张订单 <ChevronRight size={16} aria-hidden="true" />
+                      <button type="button" className="train-next-button" disabled={waitingForReceipt}
+                        onClick={() => setup(TRAIN_ORDER_INDICES[(orderIndex + 1) % TRAIN_ORDER_INDICES.length], rule)}>
+                        {orderIndex === TRAIN_ORDER_INDICES.length - 1 ? '回到订单一' : '下一张订单'} <ChevronRight size={16} aria-hidden="true" />
                       </button>
                     </div>
                   </section>
@@ -394,8 +436,9 @@ export function RewardLoopGame({ onBackToMap }: RewardLoopGameProps) {
         </div>
         <ol>
           <li><strong>出发前</strong> 选一张订单，再选回库规则。</li>
-          <li><strong>过岔口前</strong> 看当前去哪个站，想换站就点「切换道岔」。</li>
+          <li><strong>过岔口前</strong> 看当前去哪个站，想换站就点「切换道岔」。订单三到五的换道时间逐渐缩短。</li>
           <li><strong>每一圈</strong> 到站最多装一箱，核对后按规则再跑或回库。</li>
+          <li><strong>到库后</strong> 装齐的订单会记入教师端排行榜，每张订单只保留最佳圈数。</li>
         </ol>
         <form method="dialog"><button type="submit" className="train-action">明白了 <Check size={20} aria-hidden="true" /></button></form>
       </dialog>

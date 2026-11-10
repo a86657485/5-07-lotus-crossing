@@ -1,5 +1,6 @@
 import { ClassId, ExamEvaluationResult, LearningEvidence, Student, StudentSessionRecord } from '../types';
 import { makeEventId } from '../utils/eventId';
+import { TRAIN_LAP_LIMIT, TRAIN_ORDERS, type TrainResultInput } from '../lesson/trainReward';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 // A token belongs to this tab's selected student; shared preview storage is not used.
@@ -109,11 +110,71 @@ export async function apiSubmitExam(
   });
 }
 
+function trainRewardKey(studentId: string, orderIndex: number) {
+  return `g5l7.trainResult.v1.${studentId}.${orderIndex}`;
+}
+
+function readPendingTrainReward(key: string, orderIndex: number): TrainResultInput | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || 'null');
+    if (value?.orderIndex !== orderIndex || (value.rule !== 'three' && value.rule !== 'fulfilled') ||
+        !Array.isArray(value.route) || !value.route.length || value.route.length > TRAIN_LAP_LIMIT ||
+        value.route.some((lane: unknown) => lane !== 'water' && lane !== 'tools')) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiRecordTrainReward(studentId: string, submission: TrainResultInput): Promise<{ bestLaps: number }> {
+  const { orderIndex } = submission;
+  const key = trainRewardKey(studentId, orderIndex);
+  const pending = readPendingTrainReward(key, orderIndex);
+  const usePending = pending && pending.route.length <= submission.route.length;
+  const { rule, route } = usePending ? pending : submission;
+  if (!usePending) {
+    try { localStorage.setItem(key, JSON.stringify(submission)); } catch { /* Try the server without a local copy. */ }
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const result = await request<{ bestLaps: number }>('/api/reward/train/result', {
+      method: 'POST',
+      body: JSON.stringify({ studentId, orderIndex, rule, route }),
+      keepalive: true,
+      signal: controller.signal,
+    });
+    const remaining = readPendingTrainReward(key, orderIndex);
+    if (remaining && result.bestLaps <= remaining.route.length) {
+      try { localStorage.removeItem(key); } catch { /* Sending the same result again is safe. */ }
+    }
+    return result;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function retryPendingTrainRewards(studentId: string) {
+  const requests = TRAIN_ORDERS.flatMap((_, index) => {
+    const pending = readPendingTrainReward(trainRewardKey(studentId, index), index);
+    return pending ? [apiRecordTrainReward(studentId, pending)] : [];
+  });
+  return Promise.allSettled(requests);
+}
+
 export type TeacherPayload = {
   canManageExam: boolean;
   examPauses: Record<string, boolean>;
   denominator: number;
   classCounts: Record<string, number>;
+  rewardLeaderboard: Array<{
+    studentId: string;
+    name: string;
+    classId: string;
+    completedOrders: number;
+    totalExtraLaps: number;
+    orders: Array<{ orderIndex: number; bestLaps: number }>;
+  }>;
   summary: {
     total: number;
     entered: number;

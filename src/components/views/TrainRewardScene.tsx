@@ -173,7 +173,7 @@ export function TrainRewardScene({ segment, progress, direction, switchOpen, wat
       <path d="M-38 1 H-24" stroke="#294b53" strokeWidth="5" strokeLinecap="round"/>
       <rect x="-71" y="-12" width="42" height="24" rx="7" fill="#527d8a" stroke="#244858" strokeWidth="2"/>
       <rect x="-68" y="-9" width="35" height="18" rx="5" fill="#d5e9d2"/>
-      {cargo.map((color, i) => <rect key={i} x={-67 + (i % 3) * 10} y={-8 + Math.floor(i / 3) * 8} width="9" height="7"
+      {cargo.map((color, i) => <rect key={i} x={-66 + (i % 4) * 8} y={-7 + Math.floor(i / 4) * 8} width="7" height="6"
         rx="2" fill={color} stroke="#4c7380" strokeWidth=".8"/>)}
       <rect x="-25" y="-13" width="53" height="26" rx="9" fill="#f4a65a" stroke="#284b59" strokeWidth="2.5"/>
       <rect x="-22" y="-10" width="18" height="20" rx="5" fill="#236a7a" stroke="#23505d" strokeWidth="1.5"/>

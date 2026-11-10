@@ -12,10 +12,11 @@ import {
   StationProgress,
   Student,
 } from './types';
-import { apiLogin, apiGetState, apiReportEvidence, apiSaveProgress, apiUseRelic, ProgressPatch, ServerState } from './api/client';
+import { apiLogin, apiGetState, apiRecordTrainReward, apiReportEvidence, apiSaveProgress, apiUseRelic, retryPendingTrainRewards, ProgressPatch, ServerState } from './api/client';
 import { createSyncQueue } from './utils/progressSync';
 import { mergePendingEvidence, progressWithPendingEdits } from './utils/pendingEvidence';
 import { makeEventId } from './utils/eventId';
+import type { TrainResultInput } from './lesson/trainReward';
 
 type PendingEvidence = { studentId: string; evidence: LearningEvidence };
 const PENDING_EVIDENCE_KEY = 'g5l7.pendingEvidence.v1';
@@ -104,6 +105,20 @@ export default function App() {
   const sessionId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const syncQueue = useRef(createSyncQueue());
   activeStudent.current = currentStudent?.studentId || null;
+
+  const recordTrainReward = useCallback((submission: TrainResultInput) => {
+    const studentId = activeStudent.current;
+    if (!studentId) return Promise.reject(new Error('请先登录本课堂'));
+    return apiRecordTrainReward(studentId, submission);
+  }, []);
+
+  useEffect(() => {
+    if (!currentStudent) return;
+    const retry = () => { void retryPendingTrainRewards(currentStudent.studentId); };
+    retry();
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [currentStudent]);
 
   const acceptServerState = useCallback((studentId: string, state: ServerState) => {
     if (activeStudent.current !== studentId) return;
@@ -344,7 +359,7 @@ export default function App() {
       )}
 
       {currentView === 'reward_game' && (
-        <RewardLoopGame onBackToMap={() => setCurrentView('godot')} />
+        <RewardLoopGame onBackToMap={() => setCurrentView('godot')} onRecordResult={recordTrainReward} />
       )}
     </div>
   );

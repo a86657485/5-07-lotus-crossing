@@ -46,8 +46,8 @@ async function fixture(t, customRoster = roster) {
       ? await response.json() : await response.text();
     return { status: response.status, data, response };
   }
-  async function login(id = customRoster[0].id) {
-    const res = await request('/api/login', { classId: '501', studentId: id });
+  async function login(id = customRoster[0].id, classId = '501') {
+    const res = await request('/api/login', { classId, studentId: id });
     assert.equal(res.status, 200);
     return { id: res.data.student.studentId, token: res.data.sessionToken, state: res.data.state };
   }
@@ -81,6 +81,7 @@ test('student endpoints require a persistent token bound to the selected student
     ['/api/relic', { studentId: a.id }],
     ['/api/evidence', { studentId: a.id, evidence: {} }],
     ['/api/exam/submit', { studentId: a.id, answers: {} }],
+    ['/api/reward/train/result', { studentId: a.id }],
   ]) {
     assert.equal((await f.request(route, body)).status, 401, route);
     assert.equal((await f.request(route, body, 'invalid')).status, 401, route);
@@ -88,6 +89,87 @@ test('student endpoints require a persistent token bound to the selected student
   }
   await f.reopen();
   assert.equal((await f.request(`/api/state?studentId=${a.id}`, undefined, a.token)).status, 200);
+});
+
+test('only an unlocked student can record a complete train route with a valid stop', async t => {
+  const f = await fixture(t, roster.slice(0, 1));
+  const student = await f.login();
+  const completedRoute = ['water', 'water', 'tools'];
+  const record = patch => f.request('/api/reward/train/result', {
+    studentId: student.id, orderIndex: 0, rule: 'fulfilled', route: completedRoute, ...patch,
+  }, student.token);
+
+  assert.equal((await record({})).status, 409);
+  await f.ready(student);
+  const exam = await f.submit(student, correctBase, 'reward-unlock');
+  assert.equal(exam.data.state.rewardUnlocked, true);
+  const invalid = [
+    { orderIndex: -1 }, { orderIndex: 5 }, { orderIndex: '0' }, { rule: 'infinite' },
+    { route: 'water' }, { route: [] }, { route: ['water', 'water', 'other'] },
+    { route: ['water', 'tools'] }, { route: ['water', 'water', 'water'] },
+    { route: [...completedRoute, 'water'] },
+    { route: Array(25).fill('water') },
+    { rule: 'three', route: ['water', 'water', 'water', 'tools'] },
+    { orderIndex: 1, rule: 'three', route: ['water', 'tools', 'tools'] },
+  ];
+  for (const patch of invalid) assert.equal((await record(patch)).status, 400, JSON.stringify(patch));
+  assert.deepEqual((await f.request('/api/teacher')).data.rewardLeaderboard, []);
+  const best = await record({ rule: 'three', bestLaps: 1, totalExtraLaps: -9 });
+  assert.equal(best.status, 200);
+  assert.deepEqual(best.data, { bestLaps: 3 });
+  const fifth = await record({ orderIndex: 4, route: ['water', 'water', 'water', 'water', 'tools', 'tools', 'tools', 'tools'] });
+  assert.equal(fifth.status, 200);
+  assert.deepEqual(fifth.data, { bestLaps: 8 });
+  const [leader] = (await f.request('/api/teacher')).data.rewardLeaderboard;
+  assert.equal(leader.completedOrders, 2);
+  assert.deepEqual(leader.orders, [{ orderIndex: 0, bestLaps: 3 }, { orderIndex: 4, bestLaps: 8 }]);
+});
+
+test('the train leaderboard keeps personal bests, ranks distinct orders, and filters by class after restart', async t => {
+  const sameClass = roster.slice(0, 2);
+  const anotherClass = roster.find(student => student.classId === '502');
+  const f = await fixture(t, [...sameClass, anotherClass]);
+  const a = await f.login(sameClass[0].id);
+  const b = await f.login(sameClass[1].id);
+  const c = await f.login(anotherClass.id, anotherClass.classId);
+  for (const student of [a, b, c]) {
+    await f.ready(student);
+    assert.equal((await f.submit(student, correctBase, 'reward-unlock')).data.state.rewardUnlocked, true);
+  }
+  const read = student => f.request(`/api/state?studentId=${student.id}`, undefined, student.token);
+  const before = (await read(a)).data;
+  const record = async (student, orderIndex, route) => {
+    const result = await f.request('/api/reward/train/result', {
+      studentId: student.id, orderIndex, rule: 'fulfilled', route,
+    }, student.token);
+    assert.equal(result.status, 200);
+    return result.data.bestLaps;
+  };
+  const leaderboard = async (classId = '') =>
+    (await f.request(`/api/teacher${classId ? `?classId=${classId}` : ''}`)).data.rewardLeaderboard;
+  const concise = rows => rows.map(({ studentId, completedOrders, totalExtraLaps, orders }) =>
+    [studentId, completedOrders, totalExtraLaps, orders.map(({ bestLaps }) => bestLaps)]);
+
+  const optimal = ['water', 'tools', 'water'];
+  const extraLap = ['water', 'water', 'water', 'tools'];
+  assert.equal(await record(a, 0, extraLap), 4);
+  assert.equal(await record(c, 0, optimal), 3);
+  assert.deepEqual(concise(await leaderboard()), [[c.id, 1, 0, [3]], [a.id, 1, 1, [4]]]);
+  assert.equal(await record(b, 0, optimal), 3);
+  assert.equal(await record(b, 1, ['tools', 'tools', 'tools', 'tools', 'water']), 5);
+  const retries = await Promise.all([record(a, 0, optimal), record(a, 0, optimal)]);
+  assert.deepEqual(retries, [3, 3]);
+  assert.equal(await record(a, 0, extraLap), 3);
+  assert.deepEqual((await read(a)).data, before, 'reward scores must stay separate from lesson state');
+
+  await f.reopen();
+  const all = await leaderboard();
+  assert.deepEqual(concise(all), [[b.id, 2, 1, [3, 5]], [a.id, 1, 0, [3]], [c.id, 1, 0, [3]]]);
+  assert.deepEqual(all[0].orders.map(({ orderIndex }) => orderIndex), [0, 1]);
+  assert.equal(all[0].name, sameClass[1].name);
+  assert.equal(all[0].classId, '501');
+  assert.deepEqual(concise(await leaderboard('502')), [[c.id, 1, 0, [3]]]);
+  assert.deepEqual(concise(await leaderboard('501')), [[b.id, 2, 1, [3, 5]], [a.id, 1, 0, [3]]]);
 });
 
 test('three relic uses cannot be replenished by progress, station reset, or reopening SQLite', async t => {
