@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   normalizeCrossingPlan, simulateCrossing, simulateKettle, simulateTraffic,
   isTrafficReasonCorrect, simulateMaze, crossingLightAt, type CrossingPlan,
+  FIVE_CONDITION_DEMO_ARROWS, FIVE_CONDITION_ORDER, nextUntestedCondition, allFiveConditionsTested,
 } from './model';
 
 const crossing: CrossingPlan = { condition: 'cond_green_off', yes: 'observe', no: 'cross' };
@@ -58,10 +59,58 @@ test('waiting three observations is not the same rule as waiting for green', () 
 });
 
 test('a successful coincidence in one case does not certify a wrong condition', () => {
-  const plan: CrossingPlan = { condition: 'cond_bridge', yes: 'observe', no: 'cross' };
-  assert.equal(simulateCrossing(plan, 'green_at_start').outcome, 'crossed_green');
-  assert.equal(simulateCrossing(plan, 'green_at_start').correct, false);
+  const plan: CrossingPlan = { condition: 'cond_arrive', yes: 'end', no: 'cross' };
+  const green = simulateCrossing(plan, 'green_at_start');
+  assert.equal(green.outcome, 'crossed_green');
+  assert.equal(green.correct, false);
   assert.equal(simulateCrossing(plan, 'red_then_green').outcome, 'red_blocked');
+});
+
+test('skybridge demo takes the bridge once and is not a correct wait-loop', () => {
+  const plan: CrossingPlan = { condition: 'cond_bridge', ...FIVE_CONDITION_DEMO_ARROWS.cond_bridge };
+  const result = simulateCrossing(plan, 'green_at_start');
+  assert.equal(result.outcome, 'took_bridge');
+  assert.equal(result.correct, false);
+  assert.ok(result.trace.some(step => step.person === 'on_bridge' && step.position === 1));
+  assert.equal(result.trace.at(-1)?.person, 'on_bridge');
+  assert.equal(result.trace.filter(step => step.person === 'on_bridge').length, 3);
+  assert.equal(simulateCrossing(plan, 'red_then_green').outcome, 'took_bridge');
+});
+
+test('waiting three times stops at the curb with a visible count and ignores the light', () => {
+  const plan: CrossingPlan = { condition: 'cond_count', ...FIVE_CONDITION_DEMO_ARROWS.cond_count };
+  const red = simulateCrossing(plan, 'red_then_green');
+  assert.equal(red.outcome, 'ended_at_curb');
+  assert.equal(red.correct, false);
+  assert.equal(red.observations, 3);
+  assert.ok(red.trace.some(step => step.person === 'counting' && step.observations === 3));
+  assert.equal(red.trace.at(-1)?.person, 'counting');
+});
+
+test('an action used as a condition can run without yes/no arrows', () => {
+  const result = simulateCrossing({ condition: 'act_as_diamond', yes: '', no: '' }, 'green_at_start');
+  assert.equal(result.outcome, 'not_a_condition');
+  assert.equal(result.correct, false);
+});
+
+test('asking whether we arrived while still at the curb ends early or is blocked', () => {
+  const plan: CrossingPlan = { condition: 'cond_arrive', ...FIVE_CONDITION_DEMO_ARROWS.cond_arrive };
+  assert.equal(simulateCrossing(plan, 'red_then_green').outcome, 'red_blocked');
+  assert.equal(simulateCrossing(plan, 'green_at_start').correct, false);
+});
+
+test('five-condition demo arrows match the teaching table and track untested cards', () => {
+  assert.deepEqual(FIVE_CONDITION_ORDER, ['cond_bridge', 'cond_count', 'act_as_diamond', 'cond_arrive', 'cond_green_off']);
+  assert.deepEqual(FIVE_CONDITION_DEMO_ARROWS.cond_bridge, { yes: 'bridge', no: 'cross' });
+  assert.deepEqual(FIVE_CONDITION_DEMO_ARROWS.cond_count, { yes: 'end', no: 'observe' });
+  assert.deepEqual(FIVE_CONDITION_DEMO_ARROWS.act_as_diamond, { yes: '', no: '' });
+  assert.deepEqual(FIVE_CONDITION_DEMO_ARROWS.cond_arrive, { yes: 'end', no: 'cross' });
+  assert.deepEqual(FIVE_CONDITION_DEMO_ARROWS.cond_green_off, { yes: 'observe', no: 'cross' });
+  assert.equal(nextUntestedCondition([]), 'cond_bridge');
+  assert.equal(nextUntestedCondition(['cond_bridge', 'cond_count']), 'act_as_diamond');
+  assert.equal(allFiveConditionsTested(FIVE_CONDITION_ORDER), true);
+  assert.equal(allFiveConditionsTested(['cond_green_off']), false);
+  assert.deepEqual(normalizeCrossingPlan({ condition: 'cond_bridge', yes: 'bridge', no: 'cross' }), { condition: 'cond_bridge', yes: 'bridge', no: 'cross' });
 });
 
 test('missing or stale restored choices remain incomplete and safe', () => {

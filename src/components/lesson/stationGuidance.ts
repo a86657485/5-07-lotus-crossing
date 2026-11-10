@@ -1,9 +1,10 @@
-import type { CrossingPlan } from '../../lesson/model';
+import type { ConditionId, CrossingPlan } from '../../lesson/model';
+import { isCrossingPlanCorrect, nextUntestedCondition } from '../../lesson/model';
 
 export type StationKind = 's1' | 's2b' | 's2c' | 's3';
 
 type GuideTarget =
-  | 'conditions' | 'flow' | 'run' | 'comparison' | 'comparisonReplay' | 'crossingCase'
+  | 'conditions' | 'nextCondition' | 'flow' | 'run' | 'comparison' | 'comparisonReplay' | 'crossingCase'
   | 'temperature' | 'kettle' | 'nextQuestion' | 'duration' | 'reason' | 'playback' | 'check' | 'complete';
 
 type GuideState = {
@@ -12,14 +13,15 @@ type GuideState = {
   needsRevision?: boolean;
   completionLabel: string;
 } & (
-  | { station: 's1'; plan: CrossingPlan; branch: 'yes' | 'no' | ''; selectedTested: boolean; bothTested: boolean }
-  | { station: 's2b'; selected: boolean; viewed: boolean; edgeChosen: boolean }
+  | { station: 's1'; plan: CrossingPlan; branch: 'yes' | 'no' | ''; selectedTested: boolean; bothTested: boolean; testedConditions: readonly string[]; allFiveTested: boolean }
+  | { station: 's2b'; selected: boolean; viewed: boolean; viewedBoth: boolean; edgeChosen: boolean }
   | { station: 's2c'; testedTemperatures: number; selectedTested: boolean; currentQuestion: number; choices: string[]; comparedTiming: boolean }
   | { station: 's3'; baseline: boolean; units: boolean; reason: boolean; reducedQueue?: boolean }
 );
 
 const regions: Record<GuideTarget, { selector: string; location: string }> = {
   conditions: { selector: '.condition-choices', location: '看底部的条件卡片区。' },
+  nextCondition: { selector: '.condition-choices .is-next-trial', location: '看底部下一张要试的条件卡。' },
   flow: { selector: '.flow-board', location: '看右侧的流程板。' },
   run: { selector: '.primary-controls .simulate-button', location: '看底部的运行按钮。' },
   comparison: { selector: '.comparison-stage', location: '看中间两张流程图。' },
@@ -35,8 +37,8 @@ const regions: Record<GuideTarget, { selector: string; location: string }> = {
   complete: { selector: '.primary-controls .complete-button', location: '看底部的绿色完成按钮。' },
 };
 
-function step(target: GuideTarget, hint: string) {
-  return { target, hint, ...regions[target] };
+function step(target: GuideTarget, hint: string, extra: { nextCondition?: ConditionId | null } = {}) {
+  return { target, hint, ...regions[target], ...extra };
 }
 
 export function getStationGuide(state: GuideState) {
@@ -46,18 +48,37 @@ export function getStationGuide(state: GuideState) {
 
   switch (state.station) {
     case 's1': {
-      if (!state.plan.condition) return step('conditions', '先从下面选择判断条件。');
+      const next = nextUntestedCondition(state.testedConditions);
+      if (!state.allFiveTested) {
+        const labels: Record<string, string> = {
+          cond_bridge: '有可用天桥？',
+          cond_count: '已经等了三次？',
+          act_as_diamond: '原地观察红绿灯',
+          cond_arrive: '到达对面了吗？',
+          cond_green_off: '绿灯未亮起？',
+        };
+        if (!next) return step('conditions', '先把五张条件卡都试跑一遍。');
+        if (state.plan.condition !== next) {
+          return step('nextCondition', `先试这张卡：${labels[next]}，看看会怎样走。`, { nextCondition: next });
+        }
+        return step('run', '点“运行”，观察这种条件怎样走。', { nextCondition: next });
+      }
+      if (!isCrossingPlanCorrect(state.plan) && state.plan.condition !== 'cond_green_off') {
+        return step('conditions', '五种走法都看过了，选出能说明「还要再等」的条件。');
+      }
       if (state.branch) return step('flow', `点一个流程框，连接“${state.branch === 'yes' ? '是' : '否'}”。`);
-      if (!state.plan.yes || !state.plan.no) return step('flow', `点“${!state.plan.yes ? '是' : '否'}”，再点这条箭头要去的流程框。`);
-      if (state.needsRevision || state.bothTested) return step('flow', '沿着执行结果检查条件和箭头。修改流程后，再验证两种灯色。');
+      if (!state.plan.yes || !state.plan.no) return step('flow', '自己连好「是」和「否」两条箭头，再验证两种灯色。');
+      if (state.needsRevision) return step('flow', '沿着执行结果检查条件和箭头。修改流程后，再验证两种灯色。');
+      if (state.bothTested) return step('flow', '沿着执行结果检查条件和箭头。修改流程后，再验证两种灯色。');
       if (state.selectedTested) return step('crossingCase', '当前情形已运行，切换到另一种灯色再验证。');
       return step('run', '点“运行”，观察这个灯色情形下行人怎样走。');
     }
     case 's2b':
-      if (!state.selected) return step('comparison', '选一张流程图，看看它怎样执行。两张图都可以试。');
+      if (!state.selected) return step('comparison', '选一张流程图，看看它怎样执行。两张图都要运行观察。');
       if (!state.viewed) return step('comparisonReplay', '点“运行这张图”，沿着执行步骤观察。');
+      if (!state.viewedBoth) return step('comparison', '再选并运行另一张图，比较循环和天桥分支。');
       if (state.needsRevision) return step('comparison', '根据刚才的观察，重新选图或点一条箭头，再检查判断。');
-      if (!state.edgeChosen) return step('comparison', '点一条箭头作为依据，或选另一张图继续比较。');
+      if (!state.edgeChosen) return step('comparison', '两张图都看过了。点一条箭头作为依据，再检查判断。');
       return step('check', '已经标出依据，点“检查我的判断”。');
     case 's2c': {
       if (state.testedTemperatures < 2) {
