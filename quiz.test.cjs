@@ -36,4 +36,25 @@ const asObjects = { ...asStrings, B04: { diamond: '绿灯未亮？' }, B05: { re
 const r3 = evaluateAnswers(asObjects);
 assert.strictEqual(r3.baseScore, 16, `object-shaped drag_op should also score, got ${r3.baseScore}`);
 
+const misconceptions = evaluateAnswers({
+  ...asObjects,
+  B04: { diamond: '原地观察红绿灯' },
+  B16: { ...asObjects.B16, '等绿灯过街': '数满3次就停', '保温壶加热': '打开盖子作条件' },
+});
+assert.deepStrictEqual(misconceptions.details.find(d => d.questionId === 'B04').misconceptionIds, ['M3']);
+assert.deepStrictEqual(misconceptions.details.find(d => d.questionId === 'B16').misconceptionIds, ['M2', 'M3']);
+
+const design = require('./design/03_questions.json');
+const student = require('./public/assets/aistudio/03_questions_student_b0160749.json');
+assert.deepStrictEqual(BANK.answers, Object.fromEntries(design.questions.map(q => [q.id, q.answer])));
+for (const question of BANK.questions) {
+  const authoring = design.questions.find(q => q.id === question.id);
+  const copy = student.questions.find(q => q.id === question.id);
+  assert.deepStrictEqual(question.goalIds, authoring.goalIds);
+  assert.equal(question.analysis, authoring.analysis);
+  assert.deepStrictEqual(question.misconceptionMap, authoring.misconceptionMap);
+  assert.equal(copy.stem, authoring.stem);
+  for (const key of ['tier', 'type', 'options', 'cards']) assert.deepStrictEqual(question[key], copy[key]);
+}
+
 console.log('quiz.test.cjs OK', { stringAll: r1.baseScore, threeWrong: r2.baseScore, objectAll: r3.baseScore });

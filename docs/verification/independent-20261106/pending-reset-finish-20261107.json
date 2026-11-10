@@ -1,0 +1,24 @@
+{
+  "checkedDate": "2026-11-07",
+  "base": "http://192.168.0.14:18997",
+  "checks": [
+    {
+      "name": "A locally pending S3 reset survives reload and hides the old baseline despite stale server state",
+      "passed": true
+    },
+    {
+      "name": "Automatic retry uploads the reset once, preserves history and keeps already opened assessment available",
+      "passed": true
+    },
+    {
+      "name": "The already opened assessment remains reachable after the reset is synchronized",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "status": "passed",
+  "notes": [
+    "Final UI lookup accepts the dedicated continue-assessment button after current station invalidation; earlier failure was a test locator mismatch."
+  ],
+  "completedAt": "2026-11-07T02:22:03.224Z"
+}

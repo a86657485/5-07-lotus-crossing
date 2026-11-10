@@ -6,6 +6,10 @@
 
 ## 引擎与许可
 - Godot Engine 4.7.2 — MIT License（https://godotengine.org）
+- 网页流程图：React Flow / `@xyflow/react` 12.12.1，MIT，https://github.com/xyflow/xyflow；许可副本随网页保存在 `public/lesson/ReactFlow-LICENSE.txt`。
+- Blockly Games Maze 与 Botbright 用于交互机制参考：运行规则观察角色、逐步执行、暂停重试、变条件迁移。本次未复制这两个项目的源码、人物、关卡或音频。
+- 《莲花山环线·抢运物资》的轨道插画和循环逻辑为本课定制。此前的信号灯奖励关曾参考 Ruoyu Sun 的 [Traffic Light](https://github.com/insraq/traffic_planner/tree/9fb04d68f3b9d0888aadac2b036b92dc2e36c2ca)，许可副本保留在 `public/lesson/TrafficLight-LICENSE.txt`。
+- `public/lesson/textbook-s1.png`、`textbook-s2.png`、`textbook-s3.png`：用户提供的本课教材第41–43页课堂引用片段，仅供本地本课教学使用；不将教材内容声明为本项目开源素材。
 
 ## 外引素材
 - 当前 MVP 使用 ColorRect／程序化色块占位，**未引入** Kenney 等外部图集。
@@ -18,3 +22,4 @@
 
 ## Art
 - g5l7-godot-art-pack-v1（方案 A 橙马甲占位升级包，本课定制）
+- `project/assets/sprites/scenes/crossing_redesign.png`：2026-11-04 使用本会话图像生成工具，以原开场剧情图作风格参考生成的新路口背景；不含文字、流程答案、人物或车辆。原六张 `assets/story/` 剧情图保留。本图不是 GitHub 参考项目的素材，未据此授予额外开源许可。

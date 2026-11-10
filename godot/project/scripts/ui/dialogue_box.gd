@@ -110,3 +110,5 @@ func _finish() -> void:
 
 func mark_seen() -> void:
 	_seen_once = true
+	if visible:
+		_show_current()

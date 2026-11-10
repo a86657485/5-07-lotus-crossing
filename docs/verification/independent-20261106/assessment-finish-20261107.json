@@ -1,0 +1,393 @@
+{
+  "checkedDate": "2026-11-07",
+  "base": "http://192.168.0.14:18997",
+  "scope": "Continuation after the prior 11 passing LAN checks; no repeated station journey",
+  "checks": [
+    {
+      "name": "LAN identity restores the already submitted first and latest base result",
+      "passed": true
+    },
+    {
+      "name": "Saved assessment result is visible with the new first-score label",
+      "passed": true
+    },
+    {
+      "name": "B08 has two actual read-only diagrams at desktop width",
+      "passed": true
+    },
+    {
+      "name": "All six challenge questions are reachable and the required figures render",
+      "passed": true
+    },
+    {
+      "name": "Challenge submission persists separately without changing first base marks",
+      "passed": true
+    },
+    {
+      "name": "Replay closes from its first frame with Esc and assessment can be reopened",
+      "passed": true
+    },
+    {
+      "name": "Secure localhost Godot bridge resumes known progress and opens a React task",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "figures": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "id": "B08",
+      "count": 2,
+      "labels": [
+        {
+          "text": "到达路口",
+          "width": 72.2,
+          "height": 22.6
+        },
+        {
+          "text": "原地观察红绿灯",
+          "width": 126.4,
+          "height": 22.6
+        },
+        {
+          "text": "绿灯未亮？",
+          "width": 86.2,
+          "height": 21.5
+        },
+        {
+          "text": "过马路",
+          "width": 54.2,
+          "height": 22.6
+        },
+        {
+          "text": "到达对面",
+          "width": 72.2,
+          "height": 22.6
+        },
+        {
+          "text": "到达路口",
+          "width": 72.2,
+          "height": 22.6
+        },
+        {
+          "text": "有可用天桥？",
+          "width": 103.4,
+          "height": 21.5
+        },
+        {
+          "text": "上天桥",
+          "width": 54.2,
+          "height": 22.6
+        },
+        {
+          "text": "等灯",
+          "width": 36.1,
+          "height": 22.6
+        },
+        {
+          "text": "继续前行",
+          "width": 72.2,
+          "height": 22.6
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "id": "B08",
+      "count": 2,
+      "labels": [
+        {
+          "text": "到达路口",
+          "width": 77.2,
+          "height": 24.1
+        },
+        {
+          "text": "原地观察红绿灯",
+          "width": 135.2,
+          "height": 24.1
+        },
+        {
+          "text": "绿灯未亮？",
+          "width": 88.2,
+          "height": 22
+        },
+        {
+          "text": "过马路",
+          "width": 57.9,
+          "height": 24.1
+        },
+        {
+          "text": "到达对面",
+          "width": 77.2,
+          "height": 24.1
+        },
+        {
+          "text": "到达路口",
+          "width": 77.2,
+          "height": 24.1
+        },
+        {
+          "text": "有可用天桥？",
+          "width": 105.8,
+          "height": 22
+        },
+        {
+          "text": "上天桥",
+          "width": 57.9,
+          "height": 24.1
+        },
+        {
+          "text": "等灯",
+          "width": 38.6,
+          "height": 24.1
+        },
+        {
+          "text": "继续前行",
+          "width": 77.2,
+          "height": 24.1
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "id": "C01",
+      "count": 1,
+      "labels": [
+        {
+          "text": "到达路口",
+          "width": 64.5,
+          "height": 20.2
+        },
+        {
+          "text": "原地观察红绿灯",
+          "width": 113,
+          "height": 20.2
+        },
+        {
+          "text": "绿灯未亮？",
+          "width": 77,
+          "height": 19.3
+        },
+        {
+          "text": "过马路",
+          "width": 48.4,
+          "height": 20.2
+        },
+        {
+          "text": "到达对面",
+          "width": 64.5,
+          "height": 20.2
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "id": "C02",
+      "count": 2,
+      "labels": [
+        {
+          "text": "读取水温",
+          "width": 86,
+          "height": 26.9
+        },
+        {
+          "text": "水温低于设定？",
+          "width": 143.7,
+          "height": 25.7
+        },
+        {
+          "text": "继续加热",
+          "width": 86,
+          "height": 26.9
+        },
+        {
+          "text": "停止加热",
+          "width": 86,
+          "height": 26.9
+        },
+        {
+          "text": "继续加热",
+          "width": 77.3,
+          "height": 24.2
+        },
+        {
+          "text": "读取水温",
+          "width": 77.3,
+          "height": 24.2
+        },
+        {
+          "text": "水温低于设定？",
+          "width": 129.2,
+          "height": 23.1
+        },
+        {
+          "text": "停止加热",
+          "width": 77.3,
+          "height": 24.2
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "id": "C02",
+      "count": 2,
+      "labels": [
+        {
+          "text": "读取水温",
+          "width": 92,
+          "height": 28.8
+        },
+        {
+          "text": "水温低于设定？",
+          "width": 147,
+          "height": 26.3
+        },
+        {
+          "text": "继续加热",
+          "width": 92,
+          "height": 28.8
+        },
+        {
+          "text": "停止加热",
+          "width": 92,
+          "height": 28.8
+        },
+        {
+          "text": "继续加热",
+          "width": 82.7,
+          "height": 25.8
+        },
+        {
+          "text": "读取水温",
+          "width": 82.7,
+          "height": 25.8
+        },
+        {
+          "text": "水温低于设定？",
+          "width": 132.2,
+          "height": 23.6
+        },
+        {
+          "text": "停止加热",
+          "width": 82.7,
+          "height": 25.8
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "id": "C04",
+      "count": 1,
+      "labels": [
+        {
+          "text": "输入预期温度",
+          "width": 110.4,
+          "height": 23
+        },
+        {
+          "text": "读取室温",
+          "width": 73.6,
+          "height": 23
+        },
+        {
+          "text": "室温＞预期？",
+          "width": 105.3,
+          "height": 21.9
+        },
+        {
+          "text": "制冷运行",
+          "width": 73.6,
+          "height": 23
+        },
+        {
+          "text": "停止制冷",
+          "width": 73.6,
+          "height": 23
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "id": "C06",
+      "count": 1,
+      "labels": [
+        {
+          "text": "到达路口",
+          "width": 84.5,
+          "height": 26.4
+        },
+        {
+          "text": "观察并等待绿灯",
+          "width": 147.8,
+          "height": 26.4
+        },
+        {
+          "text": "过马路",
+          "width": 63.4,
+          "height": 26.4
+        },
+        {
+          "text": "到达对面",
+          "width": 84.5,
+          "height": 26.4
+        }
+      ],
+      "clipped": []
+    }
+  ],
+  "environment": {
+    "secure": false,
+    "randomUUID": "undefined"
+  },
+  "baseResult": {
+    "first": 12,
+    "latest": 12,
+    "total": 16
+  },
+  "status": "passed",
+  "nativeEvents": [
+    {
+      "event": "app:session"
+    },
+    {
+      "event": "godot:ready"
+    },
+    {
+      "event": "flow:open",
+      "panelId": "s1"
+    }
+  ],
+  "notes": [
+    "Only an existing virtual identity and isolated 18997 service were used.",
+    "Native approach animation is awaited via compositor story-panel pixels before clicking the actual close button.",
+    "B08/C02 768 screenshots were opened and visually inspected: diagrams stack vertically, labels are clear and nodes are not cut off."
+  ],
+  "completedAt": "2026-11-07T02:24:28.257Z"
+}

@@ -1,0 +1,7 @@
+[
+  { "name": "公园补给", "water": 2, "tools": 1 },
+  { "name": "工坊补给", "water": 1, "tools": 3 },
+  { "name": "湖畔补给", "water": 3, "tools": 2 },
+  { "name": "山顶补给", "water": 2, "tools": 4 },
+  { "name": "环线总调度", "water": 4, "tools": 4 }
+]

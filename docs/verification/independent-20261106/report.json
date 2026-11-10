@@ -1,0 +1,64 @@
+{
+  "startedAt": "2026-11-06T01:22:02.909Z",
+  "base": "http://127.0.0.1:18997",
+  "checks": [
+    {
+      "name": "原剧情图加载且开场可逐句完成",
+      "passed": true
+    },
+    {
+      "name": "服务不可达但浏览器在线时自动重试并本机暂存",
+      "passed": true
+    },
+    {
+      "name": "刷新后待传记录保留且不强制重看已完成开场",
+      "passed": true
+    },
+    {
+      "name": "服务恢复后补传且不重复保存",
+      "passed": true
+    },
+    {
+      "name": "水壶80与100情形及暂停、单步、继续可用",
+      "passed": true
+    },
+    {
+      "name": "Maze两种长度可用且退出不改变必做站状态",
+      "passed": true
+    },
+    {
+      "name": "三站真实完成后服务端自动开考",
+      "passed": true
+    },
+    {
+      "name": "完成后刷新回路口并可再次检测",
+      "passed": true
+    },
+    {
+      "name": "剧情回放从首帧可直接关闭",
+      "passed": true
+    },
+    {
+      "name": "不安全HTTP源下Godot启动",
+      "passed": false,
+      "reason": "浏览器isSecureContext=false且crypto.randomUUID未定义；登录成功，Godot导出启动页要求HTTPS并阻断游戏。"
+    }
+  ],
+  "pageErrors": [],
+  "notes": [
+    "原续测脚本在自动进入考核后仍尝试寻找已经销毁的Godot画布而超时；截图和服务端状态确认应用已正常开考。后续控件验证拆开执行。"
+  ],
+  "studentId": "manual-395605185ca5e7fc741a07ae",
+  "offlineRequests": 2,
+  "pausedForDiscovery": true,
+  "httpPageErrors": [],
+  "httpEnvironment": {
+    "secure": false,
+    "uuid": "undefined",
+    "method": "Playwright HTTP hostname proxy preserving Host; isolated service, not a physical student device"
+  },
+  "blockingFindings": [
+    "Godot 4.7.2 Web导出的 getMissingFeatures 在非安全上下文必然拒绝启动（public/godot/index.js:93-94）；因此局域网HTTP不能据首页200视为可上课。"
+  ],
+  "status": "等待最终UI构建回归；HTTP访问阻断已报告主控"
+}

@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/utils/evaluation.test.ts && node quiz.test.cjs",
+    "test": "tsx --test src/utils/*.test.ts src/api/*.test.ts src/lesson/*.test.ts src/components/lesson/*.test.ts && node quiz.test.cjs && node --test server.test.cjs evidence.test.cjs godot/bridge/classroom_bridge.test.cjs",
     "server": "node --no-warnings server.cjs",
     "start": "node --no-warnings server.cjs",
     "quiz:test": "node quiz.test.cjs"
@@ -21,6 +21,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
     "@vitejs/plugin-react": "^4.7.0",
+    "@xyflow/react": "12.12.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.1.1",
@@ -32,7 +33,7 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "typescript": "~5.9.3",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3"
   }
 }
