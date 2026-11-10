@@ -55,8 +55,17 @@ emit(ev, data) {
 
 自测：`node --test godot/bridge/classroom_bridge.test.cjs` 2/2 通过；`node --test server.test.cjs` 19/19 通过。
 
-## 存量数据处理（待确认）
+## 存量数据处理（已执行 · 方案 B）
 
-修复只对之后的完成动作生效。已卡住的 34 人需要在**服务端补一条解锁**，或让学生重进引导台再点一次「完成引导台」（草稿会自动恢复，通常一两步即可）。
+老师确认按方案 B 批量补记，**仅补「引导台已完成」这一层，不臆造第二/三站**。
 
-批量补记录属于写课堂数据，需老师确认后再执行，脚本不随仓库默认运行。
+- 工具：`tools/repair-s2-unlock.py`（默认只演练，`--apply` 才写库；`--include-manual` 才含测试账号）
+- 判定口径：`stations.s2_rewrite` 仍为 false，且证据中 `s2_rewrite/case_run/correct=true` 同时覆盖 `green_at_start` 与 `red_then_green`
+- 写入内容：`stations.s1_order=true`、`stations.s2_rewrite=true`；按 `stationsOk` 重算法宝（哨=通过引导台）；`stateVersion+1`；追加 `repairNote` 便于回溯
+- 备份：`../_runtime备份/runtime-20261110-1613/`（VACUUM INTO 快照 + 原始 wal/shm；备份时 224 学生 / 59 状态 / 3834 证据，integrity ok）
+- 执行结果：**503 班 28 人**补记成功（代佳蕊、何仁东、余亦城、余紫墨、刘倩秀、刘宸恺、刘语柏、周沐阳、宋嘉诚、廖烁乔、张可儿、朱其姝、李沐阳、李瑾儿、杨萧衍、林嘉远、汪子莘、温念恩、潘伟瑞、熊骏天、王梓祐、赖荣锐、赵哈斯、钟萱茹、陈佳祺、陈俊陶、项天琪、龙语心）；另 6 个 `复现*` 测试账号一并补记用于复核
+- 校验：`pragma integrity_check=ok`；59 条状态中 29 条已解锁第二站；哨法宝缺失 0
+- 界面复核：被锁账号重新登录 → 点「前往拆解台」→ 先学卡弹出 → 进入「信号拆解台·哪张图会让某一步再做一次？」面板
+
+注意：补记只改进度，不伪造学习证据；这 28 人的 `evidenceHistory` 里仍无 `evidence_lock`，教师大屏"通关证据"一栏对引导台可能仍显示缺记录，属预期。
+
