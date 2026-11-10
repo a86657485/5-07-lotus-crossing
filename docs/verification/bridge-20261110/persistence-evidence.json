@@ -1,0 +1,269 @@
+{
+  "scope": "Real HTTP/SQLite, VM callbacks only; no browser/actual Godot execution",
+  "runs": [
+    {
+      "route": "web-envelope",
+      "runtime": "VM callback / HTTP service, NOT browser or actual Godot",
+      "observations": [
+        {
+          "label": "complete-s1",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": false,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 1,
+          "stateVersion": 2
+        },
+        {
+          "label": "refresh-after-s1",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": false,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 1,
+          "stateVersion": 2
+        },
+        {
+          "label": "complete-s2b",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 3
+        },
+        {
+          "label": "switch-station-s2c",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 3
+        },
+        {
+          "label": "sqlite-reopen",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 3
+        },
+        {
+          "label": "re-login-same-student",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 4
+        },
+        {
+          "label": "complete-s2c",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": true,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 3,
+          "stateVersion": 5
+        },
+        {
+          "label": "complete-s3",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": true,
+            "s3_timing": true,
+            "exam": false
+          },
+          "examOpen": true,
+          "evidenceCount": 4,
+          "stateVersion": 6
+        },
+        {
+          "label": "KNOWN-ISSUE-revisit-edit-clears-S1",
+          "stations": {
+            "s1_order": false,
+            "s2_rewrite": false,
+            "s2_vs_branch": true,
+            "s2_kettle": true,
+            "s3_timing": true,
+            "exam": false
+          },
+          "examOpen": true,
+          "evidenceCount": 5,
+          "stateVersion": 7
+        }
+      ]
+    },
+    {
+      "route": "bridge-vm",
+      "runtime": "VM callback / HTTP service, NOT browser or actual Godot",
+      "observations": [
+        {
+          "label": "complete-s1",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": false,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 1,
+          "stateVersion": 2
+        },
+        {
+          "label": "refresh-after-s1",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": false,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 1,
+          "stateVersion": 2
+        },
+        {
+          "label": "complete-s2b",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 3
+        },
+        {
+          "label": "switch-station-s2c",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 3
+        },
+        {
+          "label": "sqlite-reopen",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 3
+        },
+        {
+          "label": "re-login-same-student",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": false,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 2,
+          "stateVersion": 4
+        },
+        {
+          "label": "complete-s2c",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": true,
+            "s3_timing": false,
+            "exam": false
+          },
+          "examOpen": false,
+          "evidenceCount": 3,
+          "stateVersion": 5
+        },
+        {
+          "label": "complete-s3",
+          "stations": {
+            "s1_order": true,
+            "s2_rewrite": true,
+            "s2_vs_branch": true,
+            "s2_kettle": true,
+            "s3_timing": true,
+            "exam": false
+          },
+          "examOpen": true,
+          "evidenceCount": 4,
+          "stateVersion": 6
+        },
+        {
+          "label": "KNOWN-ISSUE-revisit-edit-clears-S1",
+          "stations": {
+            "s1_order": false,
+            "s2_rewrite": false,
+            "s2_vs_branch": true,
+            "s2_kettle": true,
+            "s3_timing": true,
+            "exam": false
+          },
+          "examOpen": true,
+          "evidenceCount": 5,
+          "stateVersion": 7
+        }
+      ]
+    }
+  ]
+}

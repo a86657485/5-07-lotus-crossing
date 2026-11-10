@@ -1,0 +1,617 @@
+
+> lotus-crossing-5-07@0.1.0 test
+> tsx --test src/utils/*.test.ts src/api/*.test.ts src/lesson/*.test.ts src/components/lesson/*.test.ts && node quiz.test.cjs && node --test server.test.cjs evidence.test.cjs godot/bridge/classroom_bridge*.test.cjs
+
+TAP version 13
+# (node:774342) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: student requests carry their login token and submit on HTTP LAN without randomUUID
+ok 1 - student requests carry their login token and submit on HTTP LAN without randomUUID
+  ---
+  duration_ms: 18.152106
+  type: 'test'
+  ...
+# Subtest: an offline train best stays with its student and retries without replacing it with a longer route
+ok 2 - an offline train best stays with its student and retries without replacing it with a longer route
+  ---
+  duration_ms: 4.438101
+  type: 'test'
+  ...
+# Subtest: train reward aborts hung requests with AbortController, not AbortSignal.timeout
+ok 3 - train reward aborts hung requests with AbortController, not AbortSignal.timeout
+  ---
+  duration_ms: 4.837882
+  type: 'test'
+  ...
+# Subtest: crossing-style figure expands left for the back edge and right for 否
+ok 4 - crossing-style figure expands left for the back edge and right for 否
+  ---
+  duration_ms: 0.774683
+  type: 'test'
+  ...
+# Subtest: wide branch figure does not add a large extra left margin when it already spans farther
+ok 5 - wide branch figure does not add a large extra left margin when it already spans farther
+  ---
+  duration_ms: 0.304254
+  type: 'test'
+  ...
+# Subtest: already-clean tables can skip wiping only when checking comes first
+ok 6 - already-clean tables can skip wiping only when checking comes first
+  ---
+  duration_ms: 0.885951
+  type: 'test'
+  ...
+# Subtest: a dirty table requires wiping in both arrangements
+ok 7 - a dirty table requires wiping in both arrangements
+  ---
+  duration_ms: 0.184766
+  type: 'test'
+  ...
+# Subtest: phase A guides the next untested card, then the run button after it is selected
+ok 8 - phase A guides the next untested card, then the run button after it is selected
+  ---
+  duration_ms: 1.029384
+  type: 'test'
+  ...
+# Subtest: phase B starts only after all five cards are tested and does not keep demo arrows as the task
+ok 9 - phase B starts only after all five cards are tested and does not keep demo arrows as the task
+  ---
+  duration_ms: 0.178598
+  type: 'test'
+  ...
+# Subtest: phase B asks for the wait-loop condition if a trial card is still selected
+ok 10 - phase B asks for the wait-loop condition if a trial card is still selected
+  ---
+  duration_ms: 0.124428
+  type: 'test'
+  ...
+# Subtest: one correctly verified light scenario guides the learner to the other scenario before rerunning
+ok 11 - one correctly verified light scenario guides the learner to the other scenario before rerunning
+  ---
+  duration_ms: 0.111423
+  type: 'test'
+  ...
+# Subtest: wrong-condition runs are not treated as verified light colors
+ok 12 - wrong-condition runs are not treated as verified light colors
+  ---
+  duration_ms: 0.319163
+  type: 'test'
+  ...
+# Subtest: completed stations guide the completion control rather than repeating the last step
+ok 13 - completed stations guide the completion control rather than repeating the last step
+  ---
+  duration_ms: 0.681635
+  type: 'test'
+  ...
+# Subtest: diagram comparison requires both diagrams to be run before evidence selection and checking
+ok 14 - diagram comparison requires both diagrams to be run before evidence selection and checking
+  ---
+  duration_ms: 0.202019
+  type: 'test'
+  ...
+# Subtest: failed verification directs students back to the choices that can change the result
+ok 15 - failed verification directs students back to the choices that can change the result
+  ---
+  duration_ms: 0.997045
+  type: 'test'
+  ...
+# Subtest: ordinary re-entry restores the current baseline and arrangement
+ok 16 - ordinary re-entry restores the current baseline and arrangement
+  ---
+  duration_ms: 0.760274
+  type: 'test'
+  ...
+# Subtest: a server restart discards earlier runs and a draft from another generation
+ok 17 - a server restart discards earlier runs and a draft from another generation
+  ---
+  duration_ms: 0.143804
+  type: 'test'
+  ...
+# Subtest: freshStart wins a network race while prior concept support stays known
+ok 18 - freshStart wins a network race while prior concept support stays known
+  ---
+  duration_ms: 0.195969
+  type: 'test'
+  ...
+# Subtest: a new-generation draft survives ordinary re-entry without resurrecting an old baseline
+ok 19 - a new-generation draft survives ordinary re-entry without resurrecting an old baseline
+  ---
+  duration_ms: 0.14766
+  type: 'test'
+  ...
+# Subtest: support and error level persist from the student task draft
+ok 20 - support and error level persist from the student task draft
+  ---
+  duration_ms: 0.191724
+  type: 'test'
+  ...
+# Subtest: clearing a draft for restart does not erase prior support or its progressive level
+ok 21 - clearing a draft for restart does not erase prior support or its progressive level
+  ---
+  duration_ms: 0.114359
+  type: 'test'
+  ...
+# Subtest: repeating arrival may cross safely but does not describe only the repeated observation
+ok 22 - repeating arrival may cross safely but does not describe only the repeated observation
+  ---
+  duration_ms: 1.089666
+  type: 'test'
+  ...
+# Subtest: crossing repeats while red and exits when green; initially green observes only once
+ok 23 - crossing repeats while red and exits when green; initially green observes only once
+  ---
+  duration_ms: 0.231868
+  type: 'test'
+  ...
+# Subtest: signal changes on its own clock and the same plan handles different red durations
+ok 24 - signal changes on its own clock and the same plan handles different red durations
+  ---
+  duration_ms: 0.306179
+  type: 'test'
+  ...
+# Subtest: a reversed exit is blocked at the red curb and an endless loop is bounded
+ok 25 - a reversed exit is blocked at the red curb and an endless loop is bounded
+  ---
+  duration_ms: 0.319441
+  type: 'test'
+  ...
+# Subtest: waiting three observations is not the same rule as waiting for green
+ok 26 - waiting three observations is not the same rule as waiting for green
+  ---
+  duration_ms: 0.177809
+  type: 'test'
+  ...
+# Subtest: a successful coincidence in one case does not certify a wrong condition
+ok 27 - a successful coincidence in one case does not certify a wrong condition
+  ---
+  duration_ms: 0.196984
+  type: 'test'
+  ...
+# Subtest: skybridge demo takes the bridge once and is not a correct wait-loop
+ok 28 - skybridge demo takes the bridge once and is not a correct wait-loop
+  ---
+  duration_ms: 0.376713
+  type: 'test'
+  ...
+# Subtest: waiting three times stops at the curb with a visible count and ignores the light
+ok 29 - waiting three times stops at the curb with a visible count and ignores the light
+  ---
+  duration_ms: 0.194391
+  type: 'test'
+  ...
+# Subtest: an action used as a condition can run without yes/no arrows
+ok 30 - an action used as a condition can run without yes/no arrows
+  ---
+  duration_ms: 0.303069
+  type: 'test'
+  ...
+# Subtest: asking whether we arrived while still at the curb ends early or is blocked
+ok 31 - asking whether we arrived while still at the curb ends early or is blocked
+  ---
+  duration_ms: 0.373013
+  type: 'test'
+  ...
+# Subtest: five-condition demo arrows match the teaching table and track untested cards
+ok 32 - five-condition demo arrows match the teaching table and track untested cards
+  ---
+  duration_ms: 0.662238
+  type: 'test'
+  ...
+# Subtest: missing or stale restored choices remain incomplete and safe
+ok 33 - missing or stale restored choices remain incomplete and safe
+  ---
+  duration_ms: 0.186837
+  type: 'test'
+  ...
+# Subtest: actions cannot be used as a yes/no question and finishing at the curb is not arrival
+ok 34 - actions cannot be used as a yes/no question and finishing at the curb is not arrival
+  ---
+  duration_ms: 0.082271
+  type: 'test'
+  ...
+# Subtest: kettle first reads and judges before heating; reading never changes temperature
+ok 35 - kettle first reads and judges before heating; reading never changes temperature
+  ---
+  duration_ms: 0.174539
+  type: 'test'
+  ...
+# Subtest: an already hot kettle is read and stopped without any heating action
+ok 36 - an already hot kettle is read and stopped without any heating action
+  ---
+  duration_ms: 0.108078
+  type: 'test'
+  ...
+# Subtest: malformed persisted numeric values cannot make an unbounded simulation
+ok 37 - malformed persisted numeric values cannot make an unbounded simulation
+  ---
+  duration_ms: 0.472178
+  type: 'test'
+  ...
+# Subtest: traffic results depend only on the simulated duration and keep the pedestrian phase
+ok 38 - traffic results depend only on the simulated duration and keep the pedestrian phase
+  ---
+  duration_ms: 0.302604
+  type: 'test'
+  ...
+# Subtest: one maze rule reaches goals of different distances without counting first
+ok 39 - one maze rule reaches goals of different distances without counting first
+  ---
+  duration_ms: 0.116019
+  type: 'test'
+  ...
+# Subtest: maze incorrect conditions and waiting have observable, bounded outcomes
+ok 40 - maze incorrect conditions and waiting have observable, bounded outcomes
+  ---
+  duration_ms: 0.078923
+  type: 'test'
+  ...
+# Subtest: three suitable laps fill the first order and send the train to the depot
+ok 41 - three suitable laps fill the first order and send the train to the depot
+  ---
+  duration_ms: 1.13566
+  type: 'test'
+  ...
+# Subtest: three laps stop with the second order one box short even with suitable routes
+ok 42 - three laps stop with the second order one box short even with suitable routes
+  ---
+  duration_ms: 0.138654
+  type: 'test'
+  ...
+# Subtest: the order-filled rule stops after the cargo totals for all five orders
+ok 43 - the order-filled rule stops after the cargo totals for all five orders
+  ---
+  duration_ms: 0.297205
+  type: 'test'
+  ...
+# Subtest: the lap limit returns an unfilled train but accepts an order filled exactly at the limit
+ok 44 - the lap limit returns an unfilled train but accepts an order filled exactly at the limit
+  ---
+  duration_ms: 0.185878
+  type: 'test'
+  ...
+# Subtest: a repeated visit to a filled station does not load extra cargo or prevent another lap
+ok 45 - a repeated visit to a filled station does not load extra cargo or prevent another lap
+  ---
+  duration_ms: 0.132799
+  type: 'test'
+  ...
+# Subtest: the junction locks the selected route and a late switch cannot change the shipment
+ok 46 - the junction locks the selected route and a late switch cannot change the shipment
+  ---
+  duration_ms: 0.082923
+  type: 'test'
+  ...
+# Subtest: evaluateExam passes when all base answers are correct
+ok 47 - evaluateExam passes when all base answers are correct
+  ---
+  duration_ms: 1.014476
+  type: 'test'
+  ...
+# Subtest: evaluateExam passes with threshold >= 13 and both goals at least half
+ok 48 - evaluateExam passes with threshold >= 13 and both goals at least half
+  ---
+  duration_ms: 0.167562
+  type: 'test'
+  ...
+# Subtest: evaluateExam fails if G1 < 3 even if base score is 13
+ok 49 - evaluateExam fails if G1 < 3 even if base score is 13
+  ---
+  duration_ms: 0.139788
+  type: 'test'
+  ...
+# Subtest: exam draft restores matching rows and marks the question complete only after every row
+ok 50 - exam draft restores matching rows and marks the question complete only after every row
+  ---
+  duration_ms: 0.737254
+  type: 'test'
+  ...
+# Subtest: an archived complete paper may contain older option wording, while a partial matching paper cannot count as first
+ok 51 - an archived complete paper may contain older option wording, while a partial matching paper cannot count as first
+  ---
+  duration_ms: 0.206867
+  type: 'test'
+  ...
+# Subtest: getGateState locks S3 until S2 is fully completed
+ok 52 - getGateState locks S3 until S2 is fully completed
+  ---
+  duration_ms: 0.127092
+  type: 'test'
+  ...
+# Subtest: getGateState unlocks exam when all three stations are completed
+ok 53 - getGateState unlocks exam when all three stations are completed
+  ---
+  duration_ms: 0.19801
+  type: 'test'
+  ...
+# Subtest: S3 relic hint NEVER says "再跑一遍故障" if fault is already observed
+ok 54 - S3 relic hint NEVER says "再跑一遍故障" if fault is already observed
+  ---
+  duration_ms: 0.156079
+  type: 'test'
+  ...
+# Subtest: an offline reset remains the newest generation after refreshing before sync
+ok 55 - an offline reset remains the newest generation after refreshing before sync
+  ---
+  duration_ms: 1.104148
+  type: 'test'
+  ...
+# Subtest: acknowledged evidence is not duplicated and pending edits do not mutate saved progress
+ok 56 - acknowledged evidence is not duplicated and pending edits do not mutate saved progress
+  ---
+  duration_ms: 0.116952
+  type: 'test'
+  ...
+# Subtest: Godot E1 records S1 and E1 without clearing later station fields
+ok 57 - Godot E1 records S1 and E1 without clearing later station fields
+  ---
+  duration_ms: 0.963019
+  type: 'test'
+  ...
+# Subtest: an incorrect attempt is preserved without granting station completion
+ok 58 - an incorrect attempt is preserved without granting station completion
+  ---
+  duration_ms: 0.108639
+  type: 'test'
+  ...
+# Subtest: reset invalidates the current station without replenishing relics
+ok 59 - reset invalidates the current station without replenishing relics
+  ---
+  duration_ms: 0.1201
+  type: 'test'
+  ...
+# Subtest: writes finish before the exam gate, and a failed request does not block retries
+ok 60 - writes finish before the exam gate, and a failed request does not block retries
+  ---
+  duration_ms: 0.563964
+  type: 'test'
+  ...
+1..60
+# tests 60
+# suites 0
+# pass 60
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 323.110086
+quiz.test.cjs OK { stringAll: 16, threeWrong: 13, objectAll: 16 }
+TAP version 13
+# (node:774435) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: station attempts and runs survive restart, and the first station unlocks the exam
+ok 1 - station attempts and runs survive restart, and the first station unlocks the exam
+  ---
+  duration_ms: 79.706144
+  type: 'test'
+  ...
+# Error: test evidence rejection
+#     at /workspace/g5l7-five/server.cjs:844:62
+#     at transaction (/workspace/g5l7-five/server.cjs:400:22)
+#     at Server.<anonymous> (/workspace/g5l7-five/server.cjs:843:23)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+#   code: 'ERR_SQLITE_ERROR',
+#   errcode: 1811,
+#   errstr: 'constraint failed'
+# }
+# Subtest: new evidence route enforces student identity, validates data, and rolls back a rejected insert
+ok 2 - new evidence route enforces student identity, validates data, and rolls back a rejected insert
+  ---
+  duration_ms: 19.408235
+  type: 'test'
+  ...
+# Subtest: older student records keep unknown first attempts instead of inventing them
+ok 3 - older student records keep unknown first attempts instead of inventing them
+  ---
+  duration_ms: 10.062611
+  type: 'test'
+  ...
+# Subtest: case runs do not consume the first attempt; invalidation preserves history and an already open exam
+ok 4 - case runs do not consume the first attempt; invalidation preserves history and an already open exam
+  ---
+  duration_ms: 41.184086
+  type: 'test'
+  ...
+# (node:774436) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# {"route":"web-envelope","runtime":"VM callback / HTTP service, NOT browser or actual Godot","observations":[{"label":"complete-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"refresh-after-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"complete-s2b","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"switch-station-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"sqlite-reopen","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"re-login-same-student","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":4},{"label":"complete-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":3,"stateVersion":5},{"label":"complete-s3","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":4,"stateVersion":6},{"label":"KNOWN-ISSUE-revisit-edit-clears-S1","stations":{"s1_order":false,"s2_rewrite":false,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":5,"stateVersion":7}]}
+# Subtest: web-envelope: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+ok 5 - web-envelope: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+  ---
+  duration_ms: 92.852452
+  type: 'test'
+  ...
+# {"route":"bridge-vm","runtime":"VM callback / HTTP service, NOT browser or actual Godot","observations":[{"label":"complete-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"refresh-after-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"complete-s2b","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"switch-station-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"sqlite-reopen","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"re-login-same-student","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":4},{"label":"complete-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":3,"stateVersion":5},{"label":"complete-s3","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":4,"stateVersion":6},{"label":"KNOWN-ISSUE-revisit-edit-clears-S1","stations":{"s1_order":false,"s2_rewrite":false,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":5,"stateVersion":7}]}
+# Subtest: bridge-vm: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+ok 6 - bridge-vm: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+  ---
+  duration_ms: 46.633823
+  type: 'test'
+  ...
+# Subtest: Godot callback receives session and quota as a JSON string
+ok 7 - Godot callback receives session and quota as a JSON string
+  ---
+  duration_ms: 1.942248
+  type: 'test'
+  ...
+# Subtest: iframe accepts the same-origin parent once and does not echo host events
+ok 8 - iframe accepts the same-origin parent once and does not echo host events
+  ---
+  duration_ms: 0.889774
+  type: 'test'
+  ...
+# Subtest: classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+ok 9 - classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 2.157631
+  type: 'test'
+  ...
+# Subtest: ../../public/godot/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+ok 10 - ../../public/godot/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 0.768188
+  type: 'test'
+  ...
+# Subtest: ../export/web/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+ok 11 - ../export/web/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 0.65632
+  type: 'test'
+  ...
+# Subtest: nested host dispatch preserves FIFO, restores outer echo guard, and flushes once
+ok 12 - nested host dispatch preserves FIFO, restores outer echo guard, and flushes once
+  ---
+  duration_ms: 0.708749
+  type: 'test'
+  ...
+# Subtest: a throwing callback cannot strand the queue or disable later outbound events
+ok 13 - a throwing callback cannot strand the queue or disable later outbound events
+  ---
+  duration_ms: 0.681031
+  type: 'test'
+  ...
+# Subtest: host app:session suppresses same-name echo but retains callback-generated evidence
+ok 14 - host app:session suppresses same-name echo but retains callback-generated evidence
+  ---
+  duration_ms: 0.651558
+  type: 'test'
+  ...
+# Subtest: all shipped/export/source bridge copies stay byte-identical
+ok 15 - all shipped/export/source bridge copies stay byte-identical
+  ---
+  duration_ms: 0.342148
+  type: 'test'
+  ...
+# (node:774443) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: student endpoints require a persistent token bound to the selected student
+ok 16 - student endpoints require a persistent token bound to the selected student
+  ---
+  duration_ms: 115.381901
+  type: 'test'
+  ...
+# Subtest: only an unlocked student can record a complete train route with a valid stop
+ok 17 - only an unlocked student can record a complete train route with a valid stop
+  ---
+  duration_ms: 39.55502
+  type: 'test'
+  ...
+# Subtest: the train leaderboard keeps personal bests, ranks distinct orders, and filters by class after restart
+ok 18 - the train leaderboard keeps personal bests, ranks distinct orders, and filters by class after restart
+  ---
+  duration_ms: 59.06828
+  type: 'test'
+  ...
+# Subtest: three relic uses cannot be replenished by progress, station reset, or reopening SQLite
+ok 19 - three relic uses cannot be replenished by progress, station reset, or reopening SQLite
+  ---
+  duration_ms: 61.553902
+  type: 'test'
+  ...
+# Subtest: station input accepts only known boolean fields and exam status remains server owned
+ok 20 - station input accepts only known boolean fields and exam status remains server owned
+  ---
+  duration_ms: 56.941946
+  type: 'test'
+  ...
+# Subtest: retrying a confirmed relic request uses only one of the three chances
+ok 21 - retrying a confirmed relic request uses only one of the three chances
+  ---
+  duration_ms: 56.698689
+  type: 'test'
+  ...
+# Subtest: class pause persists across restart, blocks new submissions, and preserves earned eligibility
+ok 22 - class pause persists across restart, blocks new submissions, and preserves earned eligibility
+  ---
+  duration_ms: 66.524688
+  type: 'test'
+  ...
+# Subtest: exam opens after current stations pass and stays available after later edits
+ok 23 - exam opens after current stations pass and stays available after later edits
+  ---
+  duration_ms: 62.177181
+  type: 'test'
+  ...
+# Subtest: raw evidence is appended, validated, deduplicated per student, and survives reopening
+ok 24 - raw evidence is appended, validated, deduplicated per student, and survives reopening
+  ---
+  duration_ms: 76.12291
+  type: 'test'
+  ...
+# Subtest: base and challenge first answers freeze independently, with latest retained for review
+ok 25 - base and challenge first answers freeze independently, with latest retained for review
+  ---
+  duration_ms: 71.800271
+  type: 'test'
+  ...
+# Subtest: successful base first remains successful and duplicate exam events do not append
+ok 26 - successful base first remains successful and duplicate exam events do not append
+  ---
+  duration_ms: 57.271773
+  type: 'test'
+  ...
+# Error: test rejection
+#     at /workspace/g5l7-five/server.cjs:933:58
+#     at transaction (/workspace/g5l7-five/server.cjs:400:22)
+#     at Server.<anonymous> (/workspace/g5l7-five/server.cjs:929:25)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+#   code: 'ERR_SQLITE_ERROR',
+#   errcode: 1811,
+#   errstr: 'constraint failed'
+# }
+# Subtest: an event insert failure rolls back its state update
+ok 27 - an event insert failure rolls back its state update
+  ---
+  duration_ms: 63.192354
+  type: 'test'
+  ...
+# Subtest: teacher totals use only the authoritative 212-student roster, while manual students remain visible
+ok 28 - teacher totals use only the authoritative 212-student roster, while manual students remain visible
+  ---
+  duration_ms: 72.485837
+  type: 'test'
+  ...
+# Subtest: CSV escapes embedded quotes and line breaks and neutralizes formula names
+ok 29 - CSV escapes embedded quotes and line breaks and neutralizes formula names
+  ---
+  duration_ms: 13.716373
+  type: 'test'
+  ...
+# Subtest: static WASM uses its browser MIME type and design or answer sources are not student resources
+ok 30 - static WASM uses its browser MIME type and design or answer sources are not student resources
+  ---
+  duration_ms: 3053.903316
+  type: 'test'
+  ...
+# Subtest: base pass thresholds and independent challenge first results use the agreed boundary values
+ok 31 - base pass thresholds and independent challenge first results use the agreed boundary values
+  ---
+  duration_ms: 84.448105
+  type: 'test'
+  ...
+# Subtest: empty, partial or malformed exams do not freeze a first score or reveal answers
+ok 32 - empty, partial or malformed exams do not freeze a first score or reveal answers
+  ---
+  duration_ms: 48.368793
+  type: 'test'
+  ...
+# Subtest: explicit challenge requires a prior base first submission and invalid tiers are rejected
+ok 33 - explicit challenge requires a prior base first submission and invalid tiers are rejected
+  ---
+  duration_ms: 38.044734
+  type: 'test'
+  ...
+# Subtest: legacy SQLite histories recover the original first base and challenge independently
+ok 34 - legacy SQLite histories recover the original first base and challenge independently
+  ---
+  duration_ms: 48.297502
+  type: 'test'
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 34
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4205.221006

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, BookOpen, Check, ChevronRight, HelpCircle, Pause, Play, Repeat2, RotateCcw, SkipForward, Sparkles, Undo2, X } from 'lucide-react';
 import FlowDiagram, { type DiagramEdge, type DiagramNode } from './FlowDiagram';
 import LessonScene from './LessonScene';
-import { simulateCrossing, simulateKettle, simulateTraffic, isTrafficReasonCorrect, normalizeCrossingPlan, type CrossingCaseId, type CrossingPlan, type CrossingRun, type TraceStep, type TrafficUnits } from '../../lesson/model';
+import { simulateCrossing, simulateKettle, simulateTraffic, isTrafficReasonCorrect, normalizeCrossingPlan, isCrossingPlanCorrect, allFiveConditionsTested, nextUntestedCondition, FIVE_CONDITION_DEMO_ARROWS, FIVE_CONDITION_FEEDBACK, type ConditionId, type CrossingCaseId, type CrossingPlan, type CrossingRun, type TraceStep, type TrafficUnits } from '../../lesson/model';
 import { makeEventId } from '../../utils/eventId';
 import MazeTransfer from '../../lesson/MazeTransfer';
 import { restoreStationState, scaffoldFor, trafficUnits } from './stationRestore';
@@ -52,14 +52,16 @@ function usePlayback() {
   return { trace, index, running, step: trace[index], play, stop, pause: () => setRunning(false), toggle: () => setRunning(v => !v), advance: () => { setRunning(false); setIndex(i => Math.min(i + 1, trace.length - 1)); }, hasNext: trace.length > 0 && index < trace.length - 1 };
 }
 
-function crossingNodes(condition = '选择判断条件', branches = true): DiagramNode[] {
-  return [
+function crossingNodes(condition = '选择判断条件', branches = true, includeBridge = false): DiagramNode[] {
+  const nodes: DiagramNode[] = [
     { id: 'start', label: '到达十字路口', kind: 'start', x: 90, y: 0 },
     { id: 'observe', label: '观察红绿灯', kind: 'process', x: 90, y: 87 },
     { id: 'decide', label: condition, kind: 'decision', x: 70, y: 170, empty: condition === '选择判断条件', branches },
     { id: 'cross', label: '过马路', kind: 'process', x: 90, y: 330 },
     { id: 'end', label: '到达马路对面', kind: 'start', x: 90, y: 417 },
   ];
+  if (includeBridge) nodes.push({ id: 'bridge', label: '走天桥', kind: 'process', x: -140, y: 250 });
+  return nodes;
 }
 const crossingFixed: DiagramEdge[] = [{ id: 'arrive', from: 'start', to: 'observe' }, { id: 'cross_end', from: 'cross', to: 'end' }];
 const loopEdges: DiagramEdge[] = [...crossingFixed, { id: 'observe_decide', from: 'observe', to: 'decide' }, { id: 'back', from: 'decide', to: 'observe', branch: 'yes', back: true, label: '是' }, { id: 'exit', from: 'decide', to: 'cross', branch: 'no', label: '否' }];
@@ -107,6 +109,10 @@ export default function StationPanel(props: Props) {
   const [history, setHistory] = useState<CrossingPlan[]>([]);
   const [crossingCase, setCrossingCase] = useState<CrossingCaseId>('green_at_start');
   const [crossingResults, setCrossingResults] = useState<Partial<Record<CrossingCaseId, CrossingRun>>>({});
+  const [testedConditions, setTestedConditions] = useState<ConditionId[]>([]);
+  const [viewedDiagrams, setViewedDiagrams] = useState<Partial<Record<ComparisonSide, boolean>>>({});
+  const viewedDiagramsRef = useRef<Partial<Record<ComparisonSide, boolean>>>({});
+  viewedDiagramsRef.current = viewedDiagrams;
   const attemptedPlan = useRef('');
   const scaffoldedPlan = useRef('');
   const [diagramChoice, setDiagramChoice] = useState<ComparisonSide | ''>(() => ['loop', 'branch'].includes(restored.draft.diagramChoice) ? restored.draft.diagramChoice : '');
@@ -159,6 +165,17 @@ export default function StationPanel(props: Props) {
   };
 
   const updatePlan = (next: CrossingPlan) => { invalidate(); attemptedPlan.current = ''; scaffoldedPlan.current = ''; setHistory(h => [...h, { ...plan }]); setPlan(next); setCrossingResults({}); setBranch(''); };
+  const applyTrial = (id: ConditionId) => {
+    if (playback.running) return;
+    playback.stop();
+    setFeedback('');
+    setNeedsRevision(false);
+    setHistory(h => [...h, { ...plan }]);
+    const demo = FIVE_CONDITION_DEMO_ARROWS[id];
+    setPlan({ condition: id, yes: demo.yes, no: demo.no });
+    setBranch('');
+    if (id === 'cond_arrive' || id === 'cond_count') setCrossingCase('red_then_green');
+  };
   const undo = () => {
     if (playback.running) return;
     if (props.station === 's1' && history.length) { invalidate(); setPlan(history[history.length - 1]); setHistory(h => h.slice(0, -1)); setCrossingResults({}); setBranch(''); }
@@ -173,28 +190,52 @@ export default function StationPanel(props: Props) {
   });
 
   const runCrossing = (auto = true) => {
-    if (!plan.condition || !plan.yes || !plan.no) return;
+    const trialPhase = !allFiveConditionsTested(testedConditions);
+    if (plan.condition === 'act_as_diamond') { /* actions can be demonstrated without arrows */ }
+    else if (!plan.condition || !plan.yes || !plan.no) return;
     // A new explicit retry starts a new attempt; the two different cases in one round share it.
-    if (crossingResults[crossingCase]) { attemptedPlan.current = ''; scaffoldedPlan.current = ''; }
+    if (!trialPhase && crossingResults[crossingCase]) { attemptedPlan.current = ''; scaffoldedPlan.current = ''; }
     clearFeedback();
     const result = simulateCrossing(plan, crossingCase);
     playback.play(result.trace, () => {
+      if (trialPhase && plan.condition) {
+        const nextTested = testedConditions.includes(plan.condition) ? testedConditions : [...testedConditions, plan.condition];
+        setTestedConditions(nextTested);
+        emit('case_run', { conditionCardId: plan.condition, wires: { yes: plan.yes, no: plan.no }, case: result, trial: true, testedConditions: nextTested }, false);
+        if (allFiveConditionsTested(nextTested)) {
+          setPlan(current => ({ ...current, yes: '', no: '' }));
+          setCrossingResults({});
+          setBranch('');
+          setFeedback('五种走法都看过了，选出能说明「还要再等」的条件，自己连好「是／否」。');
+        } else {
+          setFeedback(FIVE_CONDITION_FEEDBACK[plan.condition]);
+        }
+        return;
+      }
       const next = { ...crossingResults, [crossingCase]: result };
       setCrossingResults(next);
-      emit('case_run', { conditionCardId: plan.condition, wires: { yes: plan.yes, no: plan.no }, case: result }, result.correct);
+      emit('case_run', { conditionCardId: plan.condition, wires: { yes: plan.yes, no: plan.no }, case: result, testedConditions }, result.correct);
       const key = JSON.stringify(plan);
       if (!result.correct && attemptedPlan.current !== key) {
         emit('attempt', { plan, caseResults: Object.values(next) }, false);
         attemptedPlan.current = key;
       }
-      if (next.green_at_start && next.red_then_green) {
-        const ok = next.green_at_start.correct && next.red_then_green.correct;
-        setPassed(ok);
-        setFeedback(ok ? '两种情况都验证了。看看哪里在重复、哪里离开。' : '有一种情况未能按任务通过。修改条件或箭头再试。');
-      } else setFeedback('这个情形已运行。换另一种灯色情形试试。');
-      const bothTested = !!next.green_at_start && !!next.red_then_green;
+      const greenOk = next.green_at_start?.correct === true;
+      const redOk = next.red_then_green?.correct === true;
+      const bothOk = greenOk && redOk;
+      const canFinish = bothOk && isCrossingPlanCorrect(plan) && allFiveConditionsTested(testedConditions);
+      if (canFinish) {
+        setPassed(true);
+        setFeedback('顺序有了。下一步把『一直等』说清楚。');
+      } else if (result.correct) {
+        setPassed(false);
+        setFeedback('这个情形已运行。换另一种灯色情形试试。');
+      } else {
+        setPassed(false);
+        setFeedback('有一种情况未能按任务通过。修改条件或箭头再试。');
+      }
       const observableFailure = result.outcome !== 'crossed_green';
-      if (!result.correct && scaffoldedPlan.current !== key && (observableFailure || bothTested)) {
+      if (!result.correct && scaffoldedPlan.current !== key && (observableFailure || (next.green_at_start && next.red_then_green))) {
         scaffoldedPlan.current = key;
         registerFailure(observableFailure ? result.trace[result.trace.length - 1]?.label : '行人通过了，但有不需要重复的步骤也被重复了。');
       }
@@ -211,8 +252,12 @@ export default function StationPanel(props: Props) {
         ];
     playback.play(trace, () => {
       setComparisonViewed(true);
-      setFeedback('这一图已运行完。可以标出依据，也可以再看另一张。');
-      emit('case_run', { kind: 'compare_diagrams', selectedSide: side, visitedNodes: trace.map(item => item.nodeId) });
+      const nextViewed = { ...viewedDiagramsRef.current, [side]: true };
+      viewedDiagramsRef.current = nextViewed;
+      setViewedDiagrams(nextViewed);
+      const both = !!(nextViewed.loop && nextViewed.branch);
+      setFeedback(both ? '两张图都运行过了。可以标出依据，再检查判断。' : '这一图已运行完。再运行另一张图，比较循环和天桥分支。');
+      emit('case_run', { kind: 'compare_diagrams', selectedSide: side, visitedNodes: trace.map(item => item.nodeId), viewedDiagrams: nextViewed });
     }, auto);
   };
   const rememberComparison = () => setComparisonHistory(old => [...old, { diagramChoice, edgeChoice, comparisonViewed }]);
@@ -233,7 +278,7 @@ export default function StationPanel(props: Props) {
     setEdgeChoice(edgeId);
   };
   const checkComparison = () => {
-    if (!comparisonViewed || !edgeChoice || playback.hasNext) return;
+    if (!comparisonViewed || !viewedDiagrams.loop || !viewedDiagrams.branch || !edgeChoice || playback.hasNext) return;
     const ok = diagramChoice === 'loop' && edgeChoice === 'back';
     if (!ok) { emit('attempt', { selectedSide: diagramChoice, edgeId: edgeChoice }, false); registerFailure(); return; }
     setPassed(true); setFeedback('你找到了让步骤再做一次的箭头。');
@@ -266,7 +311,8 @@ export default function StationPanel(props: Props) {
     }, auto);
   };
 
-  const ready = props.station === 's1' ? !!(plan.condition && plan.yes && plan.no)
+  const fiveTested = allFiveConditionsTested(testedConditions);
+  const ready = props.station === 's1' ? (plan.condition === 'act_as_diamond' || !!(plan.condition && plan.yes && plan.no))
     : props.station === 's2b' ? !!diagramChoice
     : props.station === 's2c' || !baseline || !!(units && reason);
   const startPlayback = (auto = true) => {
@@ -285,8 +331,8 @@ export default function StationPanel(props: Props) {
     completionLabel: mainText,
   };
   const guide = getStationGuide({ ...commonGuideState, ...(
-    props.station === 's1' ? { station: 's1' as const, plan, branch, selectedTested: !!crossingResults[crossingCase], bothTested: !!crossingResults.green_at_start && !!crossingResults.red_then_green }
-      : props.station === 's2b' ? { station: 's2b' as const, selected: !!diagramChoice, viewed: comparisonViewed, edgeChosen: !!edgeChoice }
+    props.station === 's1' ? { station: 's1' as const, plan, branch, selectedTested: crossingResults[crossingCase]?.correct === true, bothTested: crossingResults.green_at_start?.correct === true && crossingResults.red_then_green?.correct === true, testedConditions, allFiveTested: fiveTested }
+      : props.station === 's2b' ? { station: 's2b' as const, selected: !!diagramChoice, viewed: comparisonViewed, viewedBoth: !!(viewedDiagrams.loop && viewedDiagrams.branch), edgeChosen: !!edgeChoice }
       : props.station === 's2c' ? { station: 's2c' as const, testedTemperatures: kettleRuns.length, selectedTested: kettleRuns.includes(temperature), currentQuestion: kettleStage, choices: kettleChoices, comparedTiming: !!timingComparisons.length }
       : { station: 's3' as const, baseline, units: !!units, reason: !!reason, reducedQueue: !!trafficResult && trafficResult.remainingCars < 9 }
   ) });
@@ -294,7 +340,7 @@ export default function StationPanel(props: Props) {
   const nextNodeId = playback.hasNext ? playback.trace[playback.index + 1]?.nodeId : undefined;
   const mainAction = () => {
     if (!passed) return;
-    if (props.station === 's1') complete('E1', { conditionCardId: plan.condition, repeatCardId: 'observe', backEdgeTo: plan.yes, noEdgeTo: plan.no, caseResults: Object.values(crossingResults), capture: 'in_world_action' });
+    if (props.station === 's1') complete('E1', { conditionCardId: plan.condition, repeatCardId: 'observe', backEdgeTo: plan.yes, noEdgeTo: plan.no, caseResults: Object.values(crossingResults), testedConditions, capture: 'in_world_action' });
     if (props.station === 's2b') complete('E2', { selectedSide: diagramChoice, highlightedBackEdge: edgeChoice === 'back', observedExecution: comparisonViewed, capture: 'in_world_action' });
     if (props.station === 's2c') complete('E3', { repeatStepId: kettleChoices[0], conditionId: 'water_below_100', stopChoice: kettleChoices[1], timingChoice: kettleChoices[2], testedTemperatures: kettleRuns, comparison: timingComparisons[timingComparisons.length - 1], comparisonHistory: timingComparisons, capture: 'in_world_action' });
     if (props.station === 's3') {
@@ -352,7 +398,9 @@ export default function StationPanel(props: Props) {
     <div className="station-task"><span className="task-dot"/><p aria-live="polite">{guide.hint}</p>{playback.trace.length > 0 && <span className="trace-count">执行 {playback.index + 1}/{playback.trace.length}</span>}</div>
     {relicError && <p className="lesson-relic-error" role="status">{relicError}</p>}
     {props.station === 's2b' ? <div className="comparison-stage" inert={modalOpen}>
+      <div className="comparison-cast" aria-hidden="true"><img src="/lesson/chars/alian_stand.png" alt="" /><img src="/lesson/chars/player_stand.png" alt="" /></div>
       {[{ id: 'loop' as const, label: '方案甲', nodes: crossingNodes('绿灯未亮起？', false), edges: loopEdges }, { id: 'branch' as const, label: '方案乙', nodes: branchNodes, edges: branchEdges }].map(({ id, label, nodes, edges }) => <div className={`comparison-card ${diagramChoice === id ? 'is-selected' : ''}`} key={id}>
+        {id === 'branch' && <img className="skybridge-thumb" src="/lesson/chars/icon_skybridge.png" alt="与路口同一座人行天桥" />}
         <button className="diagram-choice" aria-pressed={diagramChoice === id} onClick={() => chooseComparison(id)}>{label}{diagramChoice === id && <Check size={18}/>}</button>
         <FlowDiagram nodes={nodes} edges={edges}
           activeNode={diagramChoice === id ? activeNode : undefined}
@@ -365,7 +413,7 @@ export default function StationPanel(props: Props) {
       </div>)}
     </div> : <div className="station-workspace" inert={modalOpen}>
       <div className="scene-frame">
-        <LessonScene kind={props.station === 's2c' ? 'kettle' : props.station === 's3' ? 'traffic' : 'crossing'} step={playback.step || (props.station === 's3' && trafficResult ? trafficResult.trace[trafficResult.trace.length - 1] : undefined)} crossingCase={crossingCase} running={playback.running} initialTemperature={temperature}/>
+        <LessonScene kind={props.station === 's2c' ? 'kettle' : props.station === 's3' ? 'traffic' : 'crossing'} step={playback.step || (props.station === 's3' && trafficResult ? trafficResult.trace[trafficResult.trace.length - 1] : undefined)} crossingCase={crossingCase} running={playback.running} initialTemperature={temperature} highlightBridge={plan.condition === 'cond_bridge' || playback.step?.person === 'on_bridge'}/>
         <div className="scene-tests">
           {props.station === 's1' && (['green_at_start', 'red_then_green'] as CrossingCaseId[]).map(id => <button disabled={playback.running} key={id} className={crossingCase === id ? 'selected' : ''} onClick={() => { playback.stop(); setCrossingCase(id); }}>{crossingResults[id] && <Check size={16}/>} {id === 'green_at_start' ? '到达时已是绿灯' : '先红灯，后来变绿'}</button>)}
           {props.station === 's2c' && ([80, 100] as const).map(t => <button key={t} disabled={playback.running} className={temperature === t ? 'selected' : ''} onClick={() => { playback.stop(); setTemperature(t); }}>{kettleRuns.includes(t) && <Check size={16}/>}开始时 {t}℃</button>)}
@@ -374,7 +422,7 @@ export default function StationPanel(props: Props) {
       </div>
       <div className="flow-board">
         <span className="board-tab">{props.station === 's1' ? '我的过马路流程' : props.station === 's2c' ? '热水壶怎样工作' : '这一轮信号安排'}</span>
-        {props.station === 's1' && <FlowDiagram nodes={crossingNodes(conditionCards.find(c => c[0] === plan.condition)?.[1])} edges={[...crossingFixed, ...(plan.condition ? [{ id: 'observe_decide', from: 'observe', to: 'decide' }] : []), ...(plan.yes ? [{ id: 'yes', from: 'decide', to: plan.yes, branch: 'yes' as const, back: ['observe', 'start'].includes(plan.yes), label: '是' }] : []), ...(plan.no ? [{ id: 'no', from: 'decide', to: plan.no, branch: 'no' as const, back: ['observe', 'start'].includes(plan.no), label: '否' }] : [])]} activeNode={activeNode} nextNodeId={nextNodeId} selectedBranch={branch} onPortSelect={port => { if (!playback.running && plan.condition) setBranch(port); }} onNodeSelect={id => { if (!playback.running && branch && ['start', 'observe', 'cross', 'end'].includes(id)) updatePlan({ ...plan, [branch]: id }); }}/>}
+        {props.station === 's1' && <FlowDiagram nodes={crossingNodes(conditionCards.find(c => c[0] === plan.condition)?.[1], true, true)} edges={[...crossingFixed, ...(plan.condition ? [{ id: 'observe_decide', from: 'observe', to: 'decide' }] : []), ...(plan.yes ? [{ id: 'yes', from: 'decide', to: plan.yes, branch: 'yes' as const, back: ['observe', 'start'].includes(plan.yes), label: '是' }] : []), ...(plan.no ? [{ id: 'no', from: 'decide', to: plan.no, branch: 'no' as const, back: ['observe', 'start'].includes(plan.no), label: '否' }] : [])]} activeNode={activeNode} nextNodeId={nextNodeId} selectedBranch={branch} onPortSelect={port => { if (!playback.running && plan.condition) setBranch(port); }} onNodeSelect={id => { if (!playback.running && branch && ['start', 'observe', 'cross', 'end', 'bridge'].includes(id)) updatePlan({ ...plan, [branch]: id }); }}/>}
         {props.station === 's2c' && <FlowDiagram nodes={kettleNodes} edges={kettleEdges} activeNode={activeNode} nextNodeId={nextNodeId}/>}
         {props.station === 's3' && <>
           <FlowDiagram nodes={[{ id: 'green', label: `绿灯时长 ${units || 3} 格`, kind: 'process', x: 90, y: 0 }, { id: 'pedestrian', label: '行人阶段 6 格', kind: 'process', x: 90, y: 100 }, { id: 'end', label: '下一轮', kind: 'start', x: 90, y: 200 }]} edges={[{ id: 'signal_next', from: 'green', to: 'pedestrian' }, { id: 'signal_repeat', from: 'pedestrian', to: 'end' }, { id: 'signal_again', from: 'end', to: 'green', back: true }]} activeNode={activeNode} nextNodeId={nextNodeId}/>
@@ -383,8 +431,8 @@ export default function StationPanel(props: Props) {
       </div>
     </div>}
     <div className="station-bottom" inert={modalOpen}>
-      <div className={`station-feedback ${passed ? 'success' : ''}`} data-scaffold-level={!passed && feedback ? scaffoldLevel : 0} aria-live="polite">{passed ? <Check size={19}/> : scaffoldLevel && feedback ? <strong className="scaffold-badge">{scaffoldLevel === 1 ? '观察提示' : scaffoldLevel === 2 ? '线索提示' : '换例子想想'}</strong> : <span className="small-arrow">↳</span>}<span>{feedback || (props.station === 's1' ? '把条件和两条箭头补好，再看看行人怎样走。' : props.station === 's2b' ? '沿着执行轨迹看步骤，再点箭头作为依据。' : props.station === 's2c' ? '读取水温和加热，是两种不同的动作。' : '先观察原方案，再让调整产生可以比较的结果。')}</span></div>
-      {props.station === 's1' && <div className="choice-row condition-choices">{conditionCards.map(([id, text]) => <button key={id} className={`lesson-choice ${plan.condition === id ? 'selected' : ''}`} disabled={playback.running} onClick={() => updatePlan({ ...plan, condition: id })}>{text}</button>)}</div>}
+      <div className={`station-feedback ${passed ? 'success' : ''}`} data-scaffold-level={!passed && feedback ? scaffoldLevel : 0} aria-live="polite">{passed ? <Check size={19}/> : scaffoldLevel && feedback ? <strong className="scaffold-badge">{scaffoldLevel === 1 ? '观察提示' : scaffoldLevel === 2 ? '线索提示' : '换例子想想'}</strong> : <span className="small-arrow">↳</span>}<span>{feedback || (props.station === 's1' ? (fiveTested ? '五种走法都看过了，选出能说明「还要再等」的条件，自己连好「是／否」。' : '先试下面的条件卡，每种都运行观察一次。') : props.station === 's2b' ? '两张图都要运行观察，再点箭头作为依据。' : props.station === 's2c' ? '读取水温和加热，是两种不同的动作。' : '先观察原方案，再让调整产生可以比较的结果。')}</span></div>
+      {props.station === 's1' && <div className="choice-row condition-choices">{conditionCards.map(([id, text]) => { const isNext = !fiveTested && nextUntestedCondition(testedConditions) === id; return <button key={id} data-condition={id} className={`lesson-choice ${plan.condition === id ? 'selected' : ''} ${isNext ? 'is-next-trial' : ''} ${testedConditions.includes(id) ? 'is-tested' : ''}`} disabled={playback.running} onClick={() => fiveTested ? updatePlan({ ...plan, condition: id }) : applyTrial(id)}>{testedConditions.includes(id) && <Check className="choice-check" size={16} aria-label="已试跑" />}{id === 'cond_bridge' && <img className="choice-skybridge" src="/lesson/chars/icon_skybridge.png" alt="" />}{text}</button>; })}</div>}
       {props.station === 's2c' && <div className="kettle-questions">
         <div className="question-tabs">{['反复做什么', '什么时候停', '先后会怎样'].map((q, i) => <button key={q} onClick={() => setKettleStage(i)} className={kettleStage === i ? 'selected' : ''}>{kettleChoices[i] ? <Check size={16}/> : <span>{i + 1}</span>}{q}</button>)}</div>
         {kettleStage < 2 ? <div className="choice-row">{(kettleStage === 0 ? [['read', '读取水温'], ['heat', '继续加热'], ['stop', '停止加热']] : [['at100', '达到100℃时'], ['below', '低于100℃时'], ['everytime', '每次判断后都停']]).map(([id, text]) => <button key={id} disabled={playback.running} className={`lesson-choice ${kettleChoices[kettleStage] === id ? 'selected' : ''}`} onClick={() => { setKettleHistory(old => [...old, { choices: [...kettleChoices], stage: kettleStage }]); invalidate(); setKettleChoices(old => old.map((v, i) => i === kettleStage ? id : v)); }}>{text}</button>)}<button className="next-question" disabled={!kettleChoices[kettleStage]} onClick={() => setKettleStage(i => i + 1)}>下一项<ChevronRight size={18}/></button></div> : <div className="choice-row timing-entry-row"><button className="lesson-choice timing-entry" onClick={() => { pauseForHelp(); setTimingOpen(true); }}><Repeat2 size={20}/>{timingComparisons.length ? '重看先后对照' : '比较：先检查，还是先擦一下？'}</button>{timingComparisons.length > 0 && <span className="timing-prediction-summary">我的预测：{kettleChoices[2] === 'ask' ? '甲' : '乙'}可能一次也不擦</span>}</div>}
@@ -404,11 +452,11 @@ export default function StationPanel(props: Props) {
           {props.station === 's2c' && passed && <button className="check-button" disabled={relicBusy} onClick={() => { playback.stop(); setMazeOpen(true); }}>选做：巡检小车</button>}
           {props.station === 's2b' && !passed && <>
             {!comparisonViewed && <button className="run-button simulate-button" disabled={!diagramChoice || playback.hasNext} onClick={() => startPlayback()}>运行这张图<Play size={20}/></button>}
-            <button className="run-button verify-button" disabled={!diagramChoice || !edgeChoice || !comparisonViewed || playback.hasNext} onClick={checkComparison}>检查我的判断<ChevronRight size={20}/></button>
+            <button className="run-button verify-button" disabled={!diagramChoice || !edgeChoice || !comparisonViewed || !viewedDiagrams.loop || !viewedDiagrams.branch || playback.hasNext} onClick={checkComparison}>检查我的判断<ChevronRight size={20}/></button>
           </>}
           {props.station === 's2c' && !passed && <button className="check-button verify-button" disabled={kettleChoices.some(v => !v) || kettleRuns.length < 2 || !timingComparisons.length || playback.hasNext} onClick={checkKettle}>检查我的选择<Check size={20}/></button>}
           {props.station !== 's2b' && !passed && <button className="run-button simulate-button" disabled={!ready || playback.running} onClick={() => startPlayback()}><Play size={22} fill="currentColor"/>{props.station === 's3' && !baseline ? '运行原方案' : props.station === 's2c' ? `运行 ${temperature}℃` : '运行'}</button>}
-          {passed && <button className="run-button complete-button" disabled={relicBusy} onClick={mainAction}>{mainText}<ChevronRight size={24}/></button>}
+          {passed && (props.station !== 's1' || fiveTested) && <button className="run-button complete-button" disabled={relicBusy} onClick={mainAction}>{mainText}<ChevronRight size={24}/></button>}
         </div>
       </div>
     </div>

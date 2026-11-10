@@ -1,0 +1,69 @@
+{
+  "startedAtShanghai": "2026-11-10T17:57:01+08:00 Asia/Shanghai",
+  "base": "http://172.30.0.2:19011",
+  "dataDir": "/tmp/g5l7-five-19011",
+  "checks": [
+    {
+      "name": "login-and-intro",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "s1-five-condition-trials-and-bridge-walk",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "s1-formalize-and-verify-both-lights",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "s1-refresh-keeps-server-completion",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "s2b-both-diagrams-and-cast",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "s2c-two-temps-and-characters",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "s3-baseline-then-duration-and-cast",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "page-errors",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "failures": [],
+  "pageErrors": [],
+  "shots": [
+    "01-s1-opening-bridge-and-cast.png",
+    "02-s1-bridge-walk.png",
+    "03-s1-count.png",
+    "04-s1-action.png",
+    "05-s1-arrive.png",
+    "06-s1-phase-b.png",
+    "07-s1-both-lights-complete.png",
+    "08-map-after-refresh.png",
+    "09-s2b-loop-and-cast.png",
+    "10-s2b-branch-skybridge.png",
+    "11-s2c-80-cast.png",
+    "12-s2c-100-cast.png",
+    "13-s3-opening-cast-bridge.png",
+    "14-s3-baseline.png",
+    "15-s3-adjusted.png"
+  ],
+  "studentId": "manual-7caf0b7cf1d2de5e2110d3d8",
+  "notes": [],
+  "finishedAtShanghai": "2026-11-10T17:57:36+08:00 Asia/Shanghai"
+}

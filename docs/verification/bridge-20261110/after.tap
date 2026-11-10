@@ -1,0 +1,80 @@
+TAP version 13
+# (node:774256) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# {"route":"web-envelope","runtime":"VM callback / HTTP service, NOT browser or actual Godot","observations":[{"label":"complete-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"refresh-after-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"complete-s2b","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"switch-station-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"sqlite-reopen","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"re-login-same-student","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":4},{"label":"complete-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":3,"stateVersion":5},{"label":"complete-s3","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":4,"stateVersion":6},{"label":"KNOWN-ISSUE-revisit-edit-clears-S1","stations":{"s1_order":false,"s2_rewrite":false,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":5,"stateVersion":7}]}
+# Subtest: web-envelope: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+ok 1 - web-envelope: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+  ---
+  duration_ms: 131.117908
+  type: 'test'
+  ...
+# {"route":"bridge-vm","runtime":"VM callback / HTTP service, NOT browser or actual Godot","observations":[{"label":"complete-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"refresh-after-s1","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":false,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":1,"stateVersion":2},{"label":"complete-s2b","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"switch-station-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"sqlite-reopen","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":3},{"label":"re-login-same-student","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":false,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":2,"stateVersion":4},{"label":"complete-s2c","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":false,"exam":false},"examOpen":false,"evidenceCount":3,"stateVersion":5},{"label":"complete-s3","stations":{"s1_order":true,"s2_rewrite":true,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":4,"stateVersion":6},{"label":"KNOWN-ISSUE-revisit-edit-clears-S1","stations":{"s1_order":false,"s2_rewrite":false,"s2_vs_branch":true,"s2_kettle":true,"s3_timing":true,"exam":false},"examOpen":true,"evidenceCount":5,"stateVersion":7}]}
+# Subtest: bridge-vm: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+ok 2 - bridge-vm: completion survives GET refresh, next station, service restart and re-login; revisit invalidation reproduced
+  ---
+  duration_ms: 50.463471
+  type: 'test'
+  ...
+# Subtest: Godot callback receives session and quota as a JSON string
+ok 3 - Godot callback receives session and quota as a JSON string
+  ---
+  duration_ms: 3.017719
+  type: 'test'
+  ...
+# Subtest: iframe accepts the same-origin parent once and does not echo host events
+ok 4 - iframe accepts the same-origin parent once and does not echo host events
+  ---
+  duration_ms: 1.113566
+  type: 'test'
+  ...
+# Subtest: classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+ok 5 - classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 3.031134
+  type: 'test'
+  ...
+# Subtest: ../../public/godot/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+ok 6 - ../../public/godot/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 1.284238
+  type: 'test'
+  ...
+# Subtest: ../export/web/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+ok 7 - ../export/web/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 1.194585
+  type: 'test'
+  ...
+# Subtest: nested host dispatch preserves FIFO, restores outer echo guard, and flushes once
+ok 8 - nested host dispatch preserves FIFO, restores outer echo guard, and flushes once
+  ---
+  duration_ms: 1.072374
+  type: 'test'
+  ...
+# Subtest: a throwing callback cannot strand the queue or disable later outbound events
+ok 9 - a throwing callback cannot strand the queue or disable later outbound events
+  ---
+  duration_ms: 1.067251
+  type: 'test'
+  ...
+# Subtest: host app:session suppresses same-name echo but retains callback-generated evidence
+ok 10 - host app:session suppresses same-name echo but retains callback-generated evidence
+  ---
+  duration_ms: 1.027201
+  type: 'test'
+  ...
+# Subtest: all shipped/export/source bridge copies stay byte-identical
+ok 11 - all shipped/export/source bridge copies stay byte-identical
+  ---
+  duration_ms: 0.565832
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 245.601401

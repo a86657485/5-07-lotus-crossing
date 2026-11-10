@@ -1,0 +1,259 @@
+TAP version 13
+# [G5L7Classroom] flow:result AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+# 1 !== 0
+#     at /workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:110:12
+#     at evalmachine.<anonymous>:23:11
+#     at Array.forEach (<anonymous>)
+#     at Object.emit (evalmachine.<anonymous>:21:28)
+#     at Object.message (evalmachine.<anonymous>:74:13)
+#     at receive (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:79:20)
+#     at TestContext.<anonymous> (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:113:3)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18) {
+#   generatedMessage: true,
+#   code: 'ERR_ASSERTION',
+#   actual: 1,
+#   expected: 0,
+#   operator: 'strictEqual',
+#   diff: 'simple'
+# }
+# Subtest: Godot callback receives session and quota as a JSON string
+ok 1 - Godot callback receives session and quota as a JSON string
+  ---
+  duration_ms: 7.985695
+  type: 'test'
+  ...
+# Subtest: iframe accepts the same-origin parent once and does not echo host events
+ok 2 - iframe accepts the same-origin parent once and does not echo host events
+  ---
+  duration_ms: 0.972499
+  type: 'test'
+  ...
+# Subtest: classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+not ok 3 - classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 3.440444
+  type: 'test'
+  location: '/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:83:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   'flow:close',
+    -   'evidence:report',
+    -   'station:unlock',
+    -   'progress:s3Detail'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'flow:close'
+    1: 'evidence:report'
+    2: 'station:unlock'
+    3: 'progress:s3Detail'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:97:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: ../../public/godot/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+not ok 4 - ../../public/godot/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 1.210573
+  type: 'test'
+  location: '/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:83:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   'flow:close',
+    -   'evidence:report',
+    -   'station:unlock',
+    -   'progress:s3Detail'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'flow:close'
+    1: 'evidence:report'
+    2: 'station:unlock'
+    3: 'progress:s3Detail'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:97:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: ../export/web/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+not ok 5 - ../export/web/classroom_bridge.js: synchronous flow callback queues completion/unlock/detail until host dispatch finishes
+  ---
+  duration_ms: 1.092308
+  type: 'test'
+  location: '/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:83:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   'flow:close',
+    -   'evidence:report',
+    -   'station:unlock',
+    -   'progress:s3Detail'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'flow:close'
+    1: 'evidence:report'
+    2: 'station:unlock'
+    3: 'progress:s3Detail'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:97:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: nested host dispatch preserves FIFO, restores outer echo guard, and flushes once
+not ok 6 - nested host dispatch preserves FIFO, restores outer echo guard, and flushes once
+  ---
+  duration_ms: 2.076613
+  type: 'test'
+  location: '/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:104:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    -   1,
+    -   2,
+        3
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 1
+    1: 2
+    2: 3
+  actual:
+    0: 3
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:114:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a throwing callback cannot strand the queue or disable later outbound events
+not ok 7 - a throwing callback cannot strand the queue or disable later outbound events
+  ---
+  duration_ms: 1.165098
+  type: 'test'
+  location: '/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:119:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    -   1,
+    -   2,
+        3
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 1
+    1: 2
+    2: 3
+  actual:
+    0: 3
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:129:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: host app:session suppresses same-name echo but retains callback-generated evidence
+not ok 8 - host app:session suppresses same-name echo but retains callback-generated evidence
+  ---
+  duration_ms: 0.921724
+  type: 'test'
+  location: '/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:131:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   'evidence:report'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'evidence:report'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/g5l7-five/godot/bridge/classroom_bridge.test.cjs:135:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: all shipped/export/source bridge copies stay byte-identical
+ok 9 - all shipped/export/source bridge copies stay byte-identical
+  ---
+  duration_ms: 1.429526
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 3
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 146.483427

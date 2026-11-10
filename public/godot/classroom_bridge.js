@@ -3,7 +3,18 @@
  */
 (function (global) {
   const handlers = {};
-  let receivingHostMessage = false;
+  // Godot 的回调是同步执行的：宿主下发 flow:result / app:session 时，GDScript 仍在同一个
+  // JS 调用栈里就会 emit 完成证据与解锁事件。早先用布尔 isReceivingHostMessage 一律拦截，
+  // 会把这些事件一并吞掉（表现为：引导台做完了，但服务端没记录，刷新后第二站进不去）。
+  // 这里只拦「同名回声」，其余事件照常上报宿主。
+  let hostEventName = null;
+  let hostDepth = 0;
+  const pendingOut = [];
+  const postToHost = (ev, data) => {
+    if (global.parent && global.parent !== global) {
+      global.parent.postMessage({ source: 'g5l7-godot', event: ev, payload: data }, global.location.origin);
+    }
+  };
   const api = {
     _student: null,
     _progress: null,
@@ -15,8 +26,10 @@
       handlers[ev] = (handlers[ev] || []).filter((f) => f !== fn);
     },
     emit(ev, data) {
-      if (!receivingHostMessage && global.parent && global.parent !== global) {
-        global.parent.postMessage({ source: 'g5l7-godot', event: ev, payload: data }, global.location.origin);
+      // 同名回声（宿主刚下发的事件被 Godot 侧原样回抛）不回传，避免自激。
+      if (ev !== hostEventName) {
+        if (hostDepth > 0) pendingOut.push([ev, data]);
+        else postToHost(ev, data);
       }
       (handlers[ev] || []).forEach((f) => {
         try {
@@ -66,7 +79,9 @@
     if (message.source !== global.parent || message.origin !== global.location.origin) return;
     if (!message.data || message.data.source !== 'g5l7-host') return;
     const { event, payload } = message.data;
-    receivingHostMessage = true;
+    const previous = hostEventName;
+    hostDepth += 1;
+    hostEventName = event;
     try {
       if (event === 'app:session') {
         api.setSession(payload?.student || payload, payload);
@@ -74,7 +89,12 @@
         api.emit(event, payload);
       }
     } finally {
-      receivingHostMessage = false;
+      hostEventName = previous;
+      hostDepth -= 1;
+      if (hostDepth === 0 && pendingOut.length) {
+        const queue = pendingOut.splice(0, pendingOut.length);
+        queue.forEach(([ev, data]) => postToHost(ev, data));
+      }
     }
   });
 })(typeof window !== 'undefined' ? window : globalThis);

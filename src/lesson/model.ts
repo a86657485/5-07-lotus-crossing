@@ -1,6 +1,6 @@
 /** Lesson simulations use discrete teaching steps, not real road or appliance timings. */
 export type ConditionId = 'cond_green_off' | 'cond_bridge' | 'cond_count' | 'act_as_diamond' | 'cond_arrive';
-export type CrossingTarget = 'observe' | 'cross' | 'start' | 'end';
+export type CrossingTarget = 'observe' | 'cross' | 'start' | 'end' | 'bridge';
 export type CrossingCaseId = 'green_at_start' | 'red_then_green';
 export interface CrossingPlan {
   condition: ConditionId | '';
@@ -11,24 +11,25 @@ export interface TraceStep {
   nodeId: string;
   label: string;
   light?: 'red' | 'green';
-  person?: 'waiting' | 'crossing' | 'stopped';
+  person?: 'waiting' | 'crossing' | 'stopped' | 'on_bridge' | 'counting';
   temperature?: number;
   heating?: boolean;
   position?: number;
   carsPassed?: number;
   carsWaiting?: number;
   elapsedUnits?: number;
+  observations?: number;
 }
 export interface CrossingRun {
   caseId: CrossingCaseId;
   trace: TraceStep[];
-  outcome: 'incomplete' | 'not_a_condition' | 'crossed_green' | 'red_blocked' | 'ended_at_curb' | 'step_limit';
+  outcome: 'incomplete' | 'not_a_condition' | 'crossed_green' | 'red_blocked' | 'ended_at_curb' | 'step_limit' | 'took_bridge';
   correct: boolean;
   observations: number;
 }
 
 const conditions: string[] = ['cond_green_off', 'cond_bridge', 'cond_count', 'act_as_diamond', 'cond_arrive'];
-const targets: string[] = ['observe', 'cross', 'start', 'end'];
+const targets: string[] = ['observe', 'cross', 'start', 'end', 'bridge'];
 
 export function normalizeCrossingPlan(value: unknown): CrossingPlan {
   const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
@@ -41,6 +42,34 @@ export function normalizeCrossingPlan(value: unknown): CrossingPlan {
 
 export function isCrossingPlanCorrect(plan: CrossingPlan): boolean {
   return plan.condition === 'cond_green_off' && plan.yes === 'observe' && plan.no === 'cross';
+}
+
+/** Phase A trial order: every card is run once before students formalize the loop. */
+export const FIVE_CONDITION_ORDER: ConditionId[] = ['cond_bridge', 'cond_count', 'act_as_diamond', 'cond_arrive', 'cond_green_off'];
+
+/** Default yes/no arrows used while demonstrating each condition card. */
+export const FIVE_CONDITION_DEMO_ARROWS: Record<ConditionId, { yes: CrossingTarget | ''; no: CrossingTarget | '' }> = {
+  cond_bridge: { yes: 'bridge', no: 'cross' },
+  cond_count: { yes: 'end', no: 'observe' },
+  act_as_diamond: { yes: '', no: '' },
+  cond_arrive: { yes: 'end', no: 'cross' },
+  cond_green_off: { yes: 'observe', no: 'cross' },
+};
+
+export const FIVE_CONDITION_FEEDBACK: Record<ConditionId, string> = {
+  cond_bridge: '走了天桥，这是选路，不是再等一次。',
+  cond_count: '数满三次就停了，没问灯还红不红。',
+  act_as_diamond: '这是动作，不能回答“是”或“否”。',
+  cond_arrive: '人还在路沿，这个问题问早了。',
+  cond_green_off: '灯还没绿就再看；绿了再过。',
+};
+
+export function nextUntestedCondition(tested: readonly string[]): ConditionId | null {
+  return FIVE_CONDITION_ORDER.find(id => !tested.includes(id)) ?? null;
+}
+
+export function allFiveConditionsTested(tested: readonly string[]): boolean {
+  return FIVE_CONDITION_ORDER.every(id => tested.includes(id));
 }
 
 export function crossingLightAt(caseId: CrossingCaseId, elapsedUnits: number, redDuration = 9): 'red' | 'green' {
@@ -58,40 +87,50 @@ export function simulateCrossing(input: CrossingPlan, caseId: CrossingCaseId, op
     caseId, trace, outcome, observations,
     correct: outcome === 'crossed_green' && isCrossingPlanCorrect(plan),
   });
-  if (!plan.condition || !plan.yes || !plan.no) {
+  // “原地观察红绿灯” is an action, not a yes/no question, so it can run without arrows.
+  if (!plan.condition || (plan.condition !== 'act_as_diamond' && (!plan.yes || !plan.no))) {
     trace.push({ nodeId: 'decide', label: '先补好判断和两条箭头，再运行。', light, person: 'waiting' });
     return finish('incomplete');
   }
+  const counting = plan.condition === 'cond_count';
   for (let step = 0; step < 24; step++) {
     // The signal has its own fixed clock; changing an observation count never changes it.
     light = crossingLightAt(caseId, step, redDuration);
     const state = { light, elapsedUnits: step };
     if (current === 'start') {
-      trace.push({ nodeId: 'start', label: '灯按模拟时间变化，观察不会让灯变绿。', ...state, person: 'waiting' });
+      trace.push({ nodeId: 'start', label: '灯按模拟时间变化，观察不会让灯变绿。', ...state, person: counting ? 'counting' : 'waiting', observations });
       current = 'observe';
     } else if (current === 'observe') {
       observations++;
-      trace.push({ nodeId: 'observe', label: `模拟时间${step}格：观察到${light === 'green' ? '绿' : '红'}灯。`, ...state, person: 'waiting' });
+      trace.push({ nodeId: 'observe', label: `模拟时间${step}格：观察到${light === 'green' ? '绿' : '红'}灯。`, ...state, person: counting ? 'counting' : 'waiting', observations });
       current = 'decide';
     } else if (current === 'decide') {
       if (plan.condition === 'act_as_diamond') {
-        trace.push({ nodeId: 'decide', label: '这是一个动作，不能回答“是”或“否”。', ...state, person: 'waiting' });
+        trace.push({ nodeId: 'decide', label: '这是一个动作，不能回答“是”或“否”。', ...state, person: 'waiting', observations });
         return finish('not_a_condition');
       }
       const answer = plan.condition === 'cond_green_off' ? light !== 'green'
-        : plan.condition === 'cond_count' ? observations >= 3 : false;
-      trace.push({ nodeId: 'decide', label: `判断结果是“${answer ? '是' : '否'}”，沿这条箭头走。`, ...state, person: 'waiting' });
+        : plan.condition === 'cond_count' ? observations >= 3
+        : plan.condition === 'cond_bridge' ? true
+        : false;
+      const person = counting ? 'counting' as const : 'waiting' as const;
+      trace.push({ nodeId: 'decide', label: `判断结果是“${answer ? '是' : '否'}”，沿这条箭头走。`, ...state, person, observations });
       current = (answer ? plan.yes : plan.no) as CrossingTarget;
     } else if (current === 'cross') {
       if (light === 'red') {
-        trace.push({ nodeId: 'cross', label: '红灯还亮着，行人在路沿安全停下。', ...state, person: 'stopped' });
+        trace.push({ nodeId: 'cross', label: '红灯还亮着，行人在路沿安全停下。', ...state, person: 'stopped', observations });
         return finish('red_blocked');
       }
-      trace.push({ nodeId: 'cross', label: '绿灯亮，行人通过斑马线。', ...state, person: 'crossing' });
-      trace.push({ nodeId: 'end', label: '到达马路对面。', ...state, person: 'crossing' });
+      trace.push({ nodeId: 'cross', label: '绿灯亮，行人通过斑马线。', ...state, person: 'crossing', observations });
+      trace.push({ nodeId: 'end', label: '到达马路对面。', ...state, person: 'crossing', observations });
       return finish('crossed_green');
+    } else if (current === 'bridge') {
+      trace.push({ nodeId: 'bridge', label: '走向天桥楼梯。', ...state, person: 'on_bridge', position: 1, observations });
+      trace.push({ nodeId: 'bridge', label: '沿楼梯走上天桥。', ...state, person: 'on_bridge', position: 2, observations });
+      trace.push({ nodeId: 'end', label: '从天桥走到对面。这是选路，不是再等一次。', ...state, person: 'on_bridge', position: 3, observations });
+      return finish('took_bridge');
     } else {
-      trace.push({ nodeId: 'end', label: '流程结束了，行人却还在路沿。', ...state, person: 'waiting' });
+      trace.push({ nodeId: 'end', label: '流程结束了，行人却还在路沿。', ...state, person: counting ? 'counting' : 'waiting', observations });
       return finish('ended_at_curb');
     }
   }
