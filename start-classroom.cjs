@@ -30,11 +30,19 @@ function lanAddresses() {
     /^10\./.test(ip) ||
     /^192\.168\./.test(ip) ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+  // 198.18.0.0/15 是 RFC 2544 基准测试保留段，被 Clash 等代理的 TUN 网卡占用；
+  // 它不属于课堂局域网，纳入会导致每次开关代理都误判"IP 变化"并重签证书。
+  const isProxyTun = (ip) => /^198\.18\./.test(ip) || /^169\.254\./.test(ip);
   const ipv4 = Object.values(os.networkInterfaces())
     .flat()
     .filter((item) => item && (item.family === 'IPv4' || item.family === 4) && !item.internal)
     .map((item) => item.address);
-  return { primary: ipv4.find(isPrivate) || ipv4[0] || '', extras: ipv4 };
+  const usable = ipv4.filter((ip) => !isProxyTun(ip));
+  return {
+    primary: usable.find(isPrivate) || usable[0] || '',
+    extras: usable,
+    ignored: ipv4.filter(isProxyTun),
+  };
 }
 
 if (!fs.existsSync(path.join(BASE, 'dist', 'index.html'))) {
@@ -50,7 +58,7 @@ try {
   return;
 }
 
-const { primary, extras } = lanAddresses();
+const { primary, extras, ignored } = lanAddresses();
 const others = extras.filter((ip) => ip !== primary);
 
 service.server.on('error', (error) => {
@@ -91,6 +99,9 @@ service.server.listen(PORT, HOST, async () => {
     console.log('  备用地址          ' + (https ? 'https://' + ip + ':' + HTTPS_PORT : 'http://' + ip + ':' + PORT));
   }
   console.log('  本机自测          ' + (https ? 'https://127.0.0.1:' + HTTPS_PORT : 'http://127.0.0.1:' + PORT));
+  if (ignored.length) {
+    console.log('  已忽略代理网卡      ' + ignored.join(', ') + '  （代理 TUN 保留段，非课堂局域网地址）');
+  }
   console.log(line);
   console.log('  数据目录          ' + DATA_DIR);
   console.log('  教师大屏免密，仅对局域网开放');

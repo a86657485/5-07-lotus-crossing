@@ -30,10 +30,14 @@ const RENEW_MARGIN_DAYS = 30;
 function lanIps() {
   const isPrivate = (ip) =>
     /^10\./.test(ip) || /^192\.168\./.test(ip) || /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+  // 排除代理 TUN 占用的 RFC 2544 保留段（198.18.0.0/15）与链路本地地址，
+  // 避免它们被写进证书 SAN 导致开关代理后反复重签。
+  const isProxyTun = (ip) => /^198\.18\./.test(ip) || /^169\.254\./.test(ip);
   const all = Object.values(os.networkInterfaces())
     .flat()
     .filter((item) => item && (item.family === 'IPv4' || item.family === 4) && !item.internal)
-    .map((item) => item.address);
+    .map((item) => item.address)
+    .filter((ip) => !isProxyTun(ip));
   return [...new Set([...all.filter(isPrivate), ...all])];
 }
 
