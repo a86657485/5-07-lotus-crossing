@@ -1,0 +1,18 @@
+
+> lotus-crossing-5-07@0.1.0 build
+> vite build
+
+vite v6.4.5 building for production...
+transforming...
+✓ 1736 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.14 kB │ gzip:   0.57 kB
+dist/assets/index-BZ7aY_yx.css  144.59 kB │ gzip:  28.15 kB
+dist/assets/index-BFW4QPXT.js   595.62 kB │ gzip: 193.72 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.09s

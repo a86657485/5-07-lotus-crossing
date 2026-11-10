@@ -1,0 +1,4 @@
+
+> lotus-crossing-5-07@0.1.0 lint
+> tsc --noEmit
+
