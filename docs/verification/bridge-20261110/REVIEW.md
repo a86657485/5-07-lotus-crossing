@@ -56,7 +56,7 @@
 ### 已备好的服务
 
 - box 上隔离服务在 **19011**，DATA_DIR=`/tmp/g5l7-pr8-bridge-20261110`，使用候选分支 production dist。
-- Godot 真路径：`http://localhost:19011/`。localhost secure context 应嵌入 `iframe title=g5l7-godot`；必须能看到真实 Godot 地图，不能把 Web 地图当作 Godot。若 WASM/图形失败，截图/控制台报错后停止，不注入模拟完成事件替代。
+- Godot 真路径：`http://127.0.0.1:19011/`。IPv4 回环地址 secure context 应嵌入 `iframe title=g5l7-godot`；必须能看到真实 Godot 地图，不能把 Web 地图当作 Godot。若 WASM/图形失败，截图/控制台报错后停止，不注入模拟完成事件替代。
 - Web 真路径：`http://172.30.0.2:19011/`（box IP；若环境换 IP，先 hostname -I）。普通非 secure HTTP 应走 Web 地图。
 - 只用 **501 班→名单外手动输入**：Godot 测试名 `桥接Godot隔离1110`，Web 测试名 `桥接Web隔离1110`。没有密码。两名学生分离，避免通关记录污染另一条路径。
 - 不要使用真实课堂学生，不要访问 8797/8766，不要启动部署脚本。
@@ -81,6 +81,17 @@
 
 `node --no-warnings docs/verification/bridge-20261110/inspect-isolated-state.cjs`
 
-检查器硬编码隔离 SQLite 路径，只 SELECT 两名测试生的 states/evidence，不读 sessions、不写 DB。每个关键节点把输出保存为 `computeruse-*-state.txt`；截图放本目录。也可用免密隔离教师页 `http://localhost:19011/teacher` 对照，但教师界面不能代替底层字段。
+检查器硬编码隔离 SQLite 路径，只 SELECT 两名测试生的 states/evidence，不读 sessions、不写 DB。每个关键节点把输出保存为 `computeruse-*-state.txt`；截图放本目录。也可用免密隔离教师页 `http://127.0.0.1:19011/teacher` 对照，但教师界面不能代替底层字段。
 
 当前检查器输出：No browser test students yet。因此此文不声称实际 Godot/Web UI 已验。
+
+
+## 20:59 Asia/Shanghai：隔离服务连接恢复核对
+
+- 服务未停止：PID **775057**，父进程 775053，命令 `node --no-warnings server.cjs`，监听 **0.0.0.0:19011（IPv4）**。
+- localhost 解析优先 `::1`；`curl -6 http://localhost:19011/` 连接拒绝（000），`curl -4` 及 `http://127.0.0.1:19011/` 均 200。与 computerUse 的 localhost 连接拒绝相符；浏览器根因仍需 computerUse 确认。
+- 精确继续 URL：**http://127.0.0.1:19011/**。Chromium 把 127/8 回环视为可信源，故仍应走 secure-context/Godot 分支；未在浏览器验证，必须确认实际 iframe/WASM 成功。
+- 无须重启、换端口或再次启动服务。端口占用来自上述已知隔离 node；没有杀任何进程。
+- HTML、Godot HTML/JS/bridge/WASM/PCK、`/api/roster` 全部 HTTP 200；详见 `connectivity-ipv4.txt`。
+- DATA_DIR、测试姓名和只读检查器均不变。127.0.0.1 与 localhost 的浏览器存储域不同，需按既定 501 班测试姓名重新登录；不要复制凭据、不要注入通关事件。
+- 只读检查器仍无测试生，不能据此认定实际 Godot 通过。

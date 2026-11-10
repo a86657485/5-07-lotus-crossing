@@ -1,0 +1,11 @@
+2026-11-10 20:59:29 Asia/Shanghai
+    PID    PPID     ELAPSED COMMAND
+ 775057  775053       04:03 node --no-warnings server.cjs
+LISTEN 0      511          0.0.0.0:19011      0.0.0.0:*    users:(("node",pid=775057,fd=24))        
+/ HTTP=200 bytes=1140 remote=127.0.0.1
+/godot/index.html HTTP=200 bytes=5519 remote=127.0.0.1
+/godot/classroom_bridge.js HTTP=200 bytes=3468 remote=127.0.0.1
+/godot/index.js HTTP=200 bytes=279815 remote=127.0.0.1
+/godot/index.wasm HTTP=200 bytes=39514754 remote=127.0.0.1
+/godot/index.pck HTTP=200 bytes=27300096 remote=127.0.0.1
+/api/roster HTTP=200 bytes=12026 remote=127.0.0.1
