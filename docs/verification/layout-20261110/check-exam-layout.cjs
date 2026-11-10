@@ -174,6 +174,29 @@ function isYellowish(color) {
           return Math.max(0, Math.round(area.getBoundingClientRect().bottom - last.bottom));
         })(),
         optionMinHeight: options.length ? Math.round(Math.min(...options.map((o) => o.getBoundingClientRect().height))) : null,
+        figureClips: [...document.querySelectorAll('[data-figure-name]')].map((card) => {
+          const canvas = card.querySelector('.question-figure-canvas') || card;
+          const cr = canvas.getBoundingClientRect();
+          const slack = 1.5;
+          const hits = [];
+          for (const el of card.querySelectorAll('.edge-word, .react-flow__edge-path, .lesson-node')) {
+            const r = el.getBoundingClientRect();
+            if (r.width < 1 || r.height < 1) continue;
+            if (r.left < cr.left - slack || r.right > cr.right + slack || r.top < cr.top - slack || r.bottom > cr.bottom + slack) {
+              hits.push({
+                kind: el.className && el.className.baseVal || el.className || el.tagName,
+                text: (el.textContent || '').trim().slice(0, 12),
+                overflow: {
+                  left: Math.round(cr.left - r.left),
+                  right: Math.round(r.right - cr.right),
+                  top: Math.round(cr.top - r.top),
+                  bottom: Math.round(r.bottom - cr.bottom),
+                },
+              });
+            }
+          }
+          return { name: card.getAttribute('data-figure-name'), clips: hits };
+        }),
         unselectedYellow,
         overflowY: document.documentElement.scrollHeight - vh,
         promptScroll: prompt ? Math.max(0, prompt.scrollHeight - prompt.clientHeight) : 0,
@@ -190,9 +213,10 @@ function isYellowish(color) {
     const noLeak = (metrics.unselectedYellow || []).length === 0;
     const oneScreen = metrics.stemInView && metrics.footerInView && metrics.visualInView && metrics.optionsInView && metrics.promptScroll <= 24;
     const optionsFill = metrics.gapBelowOptions === null || metrics.gapBelowOptions <= 28;
+    const figureClipOk = !metrics.figureClips || metrics.figureClips.every((item) => !item.clips.length);
     const figureOk = metrics.visualType !== 'figure' || (metrics.canvasH && metrics.canvasH >= (metrics.vh >= 860 ? 300 : 220));
     const recallOk = metrics.visualType !== 'recall' || metrics.recallLoaded === true;
-    const pass = tightFooter && filled && visualTall && noLeak && oneScreen && optionsFill && figureOk && recallOk && metrics.overflowY <= 8;
+    const pass = tightFooter && filled && visualTall && noLeak && oneScreen && optionsFill && figureOk && figureClipOk && recallOk && metrics.overflowY <= 8;
     const detail = JSON.stringify({
       q: metrics.question,
       type: metrics.visualType,
@@ -203,6 +227,7 @@ function isYellowish(color) {
       promptScroll: metrics.promptScroll,
       gapBelowOptions: metrics.gapBelowOptions,
       optionMinHeight: metrics.optionMinHeight,
+      figureClips: metrics.figureClips,
       overflowY: metrics.overflowY,
       unselectedYellow: metrics.unselectedYellow,
       recallSrc: metrics.recallSrc,
@@ -404,6 +429,7 @@ function isYellowish(color) {
     record('challenge-unlocked', true);
 
     await captureQuestion('C01');
+    await captureQuestion('C02');
     await captureQuestion('C03');
     await captureQuestion('C05');
 

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { BaseEdge, Handle, MarkerType, Position, ReactFlow, getSmoothStepPath, type EdgeProps, type NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { diagramContentBounds } from './diagramBounds';
 
 export type DiagramNode = { id: string; label: string; kind: 'start' | 'process' | 'decision'; x: number; y: number; empty?: boolean; branches?: boolean };
 export type DiagramEdge = { id: string; from: string; to: string; branch?: 'yes' | 'no'; label?: string; back?: boolean };
 type Props = { nodes: DiagramNode[]; edges: DiagramEdge[]; activeNode?: string; nextNodeId?: string; selectedEdge?: string; selectedBranch?: string; onNodeSelect?: (id: string) => void; onPortSelect?: (port: 'yes' | 'no') => void; onEdgeSelect?: (id: string) => void; label?: string; fitPadding?: number };
+
 
 function LessonNode({ data }: NodeProps) {
   const d = data as any;
@@ -50,7 +52,10 @@ export default function FlowDiagram(props: Props) {
   const fit = useRef<() => void>(() => {});
   const fitPadding = useRef(props.fitPadding ?? 0.18);
   fitPadding.current = props.fitPadding ?? 0.18;
-  const layoutKey = props.nodes.map(n => `${n.id}:${n.kind}:${n.x}:${n.y}`).join('|');
+  const contentBounds = useMemo(() => diagramContentBounds(props.nodes, props.edges), [props.nodes, props.edges]);
+  const boundsRef = useRef(contentBounds);
+  boundsRef.current = contentBounds;
+  const layoutKey = props.nodes.map(n => `${n.id}:${n.kind}:${n.x}:${n.y}`).join('|') + '|' + props.edges.map(e => `${e.id}:${e.from}:${e.to}:${e.back ? 'back' : ''}:${e.branch || ''}:${e.label || ''}`).join('|');
   useEffect(() => {
     let frame = 0;
     const observer = new ResizeObserver(() => {
@@ -70,6 +75,6 @@ export default function FlowDiagram(props: Props) {
   const nodes = useMemo(() => props.nodes.map(n => ({ id: n.id, type: 'lesson', position: { x: n.x, y: n.y }, data: { ...n, active: props.activeNode === n.id, selectable: !!props.onNodeSelect, selectedBranch: props.selectedBranch, onPort: props.onPortSelect }, width: n.kind === 'decision' ? 240 : 200, height: n.kind === 'decision' ? 100 : 54, draggable: false })), [props.nodes, props.activeNode, props.onNodeSelect, props.onPortSelect, props.selectedBranch]);
   const edges = useMemo(() => props.edges.map(e => ({ id: e.id, type: 'lesson', source: e.from, target: e.to, sourceHandle: e.branch || 'bottom', targetHandle: e.back ? 'left' : 'top', label: e.label, markerEnd: { type: MarkerType.ArrowClosed, color: props.selectedEdge === e.id ? '#f58b20' : '#367abd' }, data: { back: e.back, selected: props.selectedEdge === e.id }, animated: props.activeNode === e.from && props.nextNodeId === e.to })), [props.edges, props.selectedEdge, props.activeNode, props.nextNodeId]);
   return <div ref={container} className="lesson-flow" aria-label={props.label || '可操作流程图'}>
-    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onInit={instance => { fit.current = () => { void instance.fitView({ padding: fitPadding.current, duration: 0 }); }; fit.current(); }} fitView fitViewOptions={{ padding: props.fitPadding ?? 0.18 }} minZoom={.25} maxZoom={1.1} nodesDraggable={false} nodesConnectable={false} panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnDoubleClick={false} zoomOnPinch={false} elementsSelectable={false} onNodeClick={(_, node) => props.onNodeSelect?.(node.id)} onEdgeClick={(_, edge) => props.onEdgeSelect?.(edge.id)} preventScrolling={false} />
+    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onInit={instance => { fit.current = () => { const box = boundsRef.current; if (box.width > 0 && box.height > 0) void instance.fitBounds(box, { padding: fitPadding.current, duration: 0 }); }; fit.current(); }} minZoom={.25} maxZoom={1.1} nodesDraggable={false} nodesConnectable={false} panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnDoubleClick={false} zoomOnPinch={false} elementsSelectable={false} onNodeClick={(_, node) => props.onNodeSelect?.(node.id)} onEdgeClick={(_, edge) => props.onEdgeSelect?.(edge.id)} preventScrolling={false} />
   </div>;
 }
