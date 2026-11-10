@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ExamEvaluationResult, LearningEvidence } from '../../types';
 import { apiSetClassExamPaused, apiTeacher, teacherExportUrl, type TeacherPayload } from '../../api/client';
 import { RewardLeaderboard } from './RewardLeaderboard';
+import { TeacherOverview, type OverviewPupil } from './TeacherOverview';
+import './teacherDashboard.css';
 
 type Pupil = TeacherPayload['students'][number];
 type SortField = 'classId' | 'name' | 'lastSync' | 'first' | 'latest' | 'support';
@@ -9,9 +11,12 @@ type SortKey = { field: SortField; ascending: boolean };
 type ScoreRange = { min: string; max: string };
 
 const classIds = ['501', '502', '503', '504'];
-const control = 'bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline focus:outline-2 focus:outline-sky-400';
-const button = 'rounded-lg bg-slate-700 hover:bg-slate-600 px-3 py-2 text-sm focus:outline focus:outline-2 focus:outline-sky-400 disabled:opacity-50';
-const panel = 'bg-slate-800/80 border border-slate-700 rounded-xl p-4';
+const control = 'g5-teacher-control';
+const button = 'g5-teacher-button';
+const defaultSorting: SortKey[] = [{ field: 'classId', ascending: true }];
+const sortLabels: Record<SortField, string> = {
+  classId: '班级', name: '姓名', first: '基础首答', latest: '基础最近', support: '法宝', lastSync: '最近同步',
+};
 const taskNames: Record<string, string> = {
   s1_order: '第一站 过街顺序',
   s2_rewrite: '第一站 过街流程图',
@@ -44,6 +49,19 @@ const misconceptions: Record<string, string> = {
 const firstResult = (row: Pupil) => row.examFirstComplete ? row.examFirstResult || row.examResult : null;
 const recentResult = (row: Pupil) => row.examLatestComplete ? row.examLatestResult || firstResult(row) : firstResult(row);
 const secondStationDone = (row: Pupil) => row.stations.s2_rewrite && row.stations.s2_vs_branch && row.stations.s2_kettle;
+const stationFlags = (row: Pupil) => [row.stations.s1_order, secondStationDone(row), row.stations.s3_timing] as const;
+
+function overviewPupil(row: Pupil): OverviewPupil {
+  const first = firstResult(row);
+  return {
+    entered: row.entered,
+    stationFlags: stationFlags(row),
+    firstScore: first?.baseScore ?? null,
+    latestScore: recentResult(row)?.baseScore ?? null,
+    firstPassed: !!first?.passed,
+    challengePassed: row.challengeFirstComplete && !!(row.challengeFirstResult || row.examResult)?.challengePassed,
+  };
+}
 
 function getEvidence(row: Pupil) {
   const entries = new Map<string, LearningEvidence>();
@@ -107,7 +125,24 @@ function PupilEvidence({ row, evidence }: { row: Pupil; evidence: LearningEviden
   const problems = latest?.details.filter(item => !item.correct) || [];
   const required = evidence.filter(item => item.payload?.optional !== true && item.payload?.scenario !== 'maze_transfer');
   const optional = evidence.filter(item => item.payload?.optional === true || item.payload?.scenario === 'maze_transfer');
-  return <div className="grid gap-3 md:grid-cols-3 p-2">
+  const passed = stationFlags(row);
+  const stations = [
+    { name: '行人过街引导台', tasks: ['s1_order', 's2_rewrite'] },
+    { name: '信号循环拆解台', tasks: ['s2_vs_branch', 's2_kettle'] },
+    { name: '路口信号调度台', tasks: ['s3_timing'] },
+  ];
+  return <div className="g5-teacher-evidence">
+    <div className="g5-teacher-evidence-grid">
+      {stations.map(({ name, tasks }, index) => {
+        const count = required.filter(item => tasks.includes(item.taskId)).length;
+        return <section className="g5-teacher-evidence-card" key={name}>
+          <h3>{name}</h3>
+          <p><span className="g5-teacher-badge" data-tone={passed[index] ? 'ok' : 'neutral'}>{passed[index] ? '当前通过' : '尚未通过'}</span></p>
+          <p>{count ? `${count} 条探究记录` : '尚无证据'}</p>
+        </section>;
+      })}
+    </div>
+    <div className="g5-teacher-evidence-grid">
     <section>
       <h3 className="font-semibold mb-1">成绩与目标</h3>
       <p>首答 {scoreLabel(firstResult(row))} · {goalLabel(firstResult(row))}</p>
@@ -125,7 +160,7 @@ function PupilEvidence({ row, evidence }: { row: Pupil; evidence: LearningEviden
           {taskNames[item.taskId]} · {eventNames[item.eventType] || '操作记录'} · {attemptNames[item.attemptKind || 'unknown']}
           {item.payload?.supportUsed === true ? ' · 获得支持' : ''}
           {item.correct == null ? '' : item.correct ? ' · 符合预期' : ' · 待修正'}
-          <span className="block text-slate-400">{formatTime(item.receivedAt)}</span>
+          <span className="block g5-teacher-muted">{formatTime(item.receivedAt)}</span>
         </li>
       )}</ul> : <p>尚无证据</p>}
       <p className="mt-2">选做巡检记录 {optional.length || '尚无证据'}</p>
@@ -137,6 +172,7 @@ function PupilEvidence({ row, evidence }: { row: Pupil; evidence: LearningEviden
           .map(id => misconceptions[id] || id).join('、') || '未分类'}
       </li>)}</ul> : <p>{latest?.details.length ? '本次没有错题' : '尚无逐题证据'}</p>}
     </section>
+    </div>
   </div>;
 }
 
@@ -149,7 +185,7 @@ export const TeacherDashboardView: React.FC<{ onBackToApp?: () => void }> = ({ o
   const [supportFilter, setSupportFilter] = useState('all');
   const [firstRange, setFirstRange] = useState<ScoreRange>({ min: '', max: '' });
   const [latestRange, setLatestRange] = useState<ScoreRange>({ min: '', max: '' });
-  const [sorting, setSorting] = useState<SortKey[]>([{ field: 'classId', ascending: true }]);
+  const [sorting, setSorting] = useState<SortKey[]>(defaultSorting);
   const [addSort, setAddSort] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [payload, setPayload] = useState<TeacherPayload | null>(null);
@@ -163,7 +199,7 @@ export const TeacherDashboardView: React.FC<{ onBackToApp?: () => void }> = ({ o
     const id = ++latestRequest.current;
     setLoading(true);
     try {
-      // Whole-grade data remains the basis for the header even when the table is filtered.
+      // Fetch the grade once per refresh so class changes and detail filters stay local.
       const result = await apiTeacher();
       if (id !== latestRequest.current) return;
       setPayload(result);
@@ -181,6 +217,13 @@ export const TeacherDashboardView: React.FC<{ onBackToApp?: () => void }> = ({ o
     const timer = window.setInterval(() => void refresh(), 8000);
     return () => { window.clearInterval(timer); latestRequest.current++; };
   }, [refresh]);
+
+  const hasPayload = payload !== null;
+  useEffect(() => {
+    if (hasPayload && window.location.hash === '#reward-leaderboard-title') {
+      document.getElementById('reward-leaderboard-title')?.scrollIntoView({ block: 'start' });
+    }
+  }, [hasPayload]);
 
   const evidenceByPupil = useMemo(() =>
     new Map((payload?.students || []).map(row => [row.student.studentId, getEvidence(row)])), [payload]);
@@ -221,12 +264,12 @@ export const TeacherDashboardView: React.FC<{ onBackToApp?: () => void }> = ({ o
     });
   }
 
-  function sortHeader(field: SortField, label: string) {
+  function sortHeader(field: SortField) {
     const index = sorting.findIndex(item => item.field === field);
     const key = sorting[index];
-    return <th className="px-3 py-3" aria-sort={index === 0 ? key.ascending ? 'ascending' : 'descending' : undefined}>
-      <button className="hover:text-white focus:outline focus:outline-2 focus:outline-sky-400" onClick={e => changeSort(field, addSort || e.shiftKey)}>
-        {label}{key && ` ${index + 1}${key.ascending ? '↑' : '↓'}`}
+    return <th scope="col" aria-sort={index === 0 ? key.ascending ? 'ascending' : 'descending' : undefined}>
+      <button className="g5-teacher-sort" onClick={e => changeSort(field, addSort || e.shiftKey)}>
+        {sortLabels[field]}{key && <small>{index + 1}{key.ascending ? '↑' : '↓'}</small>}
       </button>
     </th>;
   }
@@ -248,120 +291,148 @@ export const TeacherDashboardView: React.FC<{ onBackToApp?: () => void }> = ({ o
     }
   }
 
-  const summary = payload?.summary;
-  const total = summary?.total ?? 0;
-  const overview: Array<[string, number]> = [
-    ['已进入', summary?.entered ?? 0], ['第一站完成', summary?.s1 ?? 0],
-    ['第二站完成', summary?.s2 ?? 0], ['第三站完成', summary?.s3 ?? 0],
-    ['基础首答达标', summary?.examPassed ?? 0], ['挑战加分', summary?.challengeBonus ?? 0],
-  ];
-  const bars: Array<[string, number]> = [
-    ['已进入', rows.filter(row => row.entered).length],
-    ['第一站完成', rows.filter(row => row.stations.s1_order).length],
-    ['第二站完成', rows.filter(secondStationDone).length],
-    ['第三站完成', rows.filter(row => row.stations.s3_timing).length],
-    ['基础首答达标', rows.filter(row => firstResult(row)?.passed).length],
-  ];
+  const classRoster = payload ? payload.students
+    .filter(({ student }) => student.rosterSource === 'roster' &&
+      (selectedClass === 'all' || student.classId === selectedClass))
+    .map(overviewPupil) : null;
+  const hasFilters = !!searchQuery.trim() || [passFilter, targetFilter, evidenceFilter, supportFilter].some(value => value !== 'all') ||
+    !!(firstRange.min || firstRange.max || latestRange.min || latestRange.max);
+  const overviewRows = rows.map(overviewPupil);
+  const isClassSelected = selectedClass !== 'all';
+  const isPaused = payload?.examPauses[selectedClass];
+  const examStatus = !isClassSelected ? '选择班级后查看考核状态'
+    : !payload ? '考核状态尚未获取'
+    : isPaused ? '考核已暂停' : '考核开放中';
+  const localTeacherUrl = new URL('/teacher', window.location.href);
+  localTeacherUrl.hostname = 'localhost';
 
-  return <div className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-6 space-y-4">
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-xl font-bold">五年级第7课 · 莲花山智慧路口教师大屏</h1>
-        <p className="text-sm text-slate-400 mt-1" aria-live="polite">{loadError || (loading ? '正在同步…' : `更新于 ${formatTime(payload?.updatedAt)}`)}</p></div>
-      <div className="flex flex-wrap gap-2">
-        <button className={button} onClick={() => void refresh()}>立即刷新</button>
-        <a className={button} href={teacherExportUrl(selectedClass === 'all' ? undefined : selectedClass)} download>导出课堂 CSV</a>
-        {onBackToApp && <button className={button} onClick={onBackToApp}>返回学生端</button>}
+  const filters = (
+    <details className="g5-teacher-card g5-teacher-filters">
+      <summary>
+        <strong>明细筛选</strong>
+        <span>{hasFilters ? '已应用筛选 · ' : ''}{payload ? `${rows.length} 人` : '等待数据'}</span>
+      </summary>
+      <div className="g5-teacher-filter-body">
+        <div className="g5-teacher-filter-grid">
+          <label>学生姓名
+            <input aria-label="学生姓名" className={control} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="搜索姓名" />
+          </label>
+          <label>考核状态
+            <select aria-label="考核状态" className={control} value={passFilter} onChange={e => setPassFilter(e.target.value)}>
+              <option value="all">全部考核状态</option><option value="passed">已达标</option><option value="failed">未达标</option><option value="no_record">尚无考核记录</option>
+            </select>
+          </label>
+          <label>首答目标
+            <select aria-label="首答目标" className={control} value={targetFilter} onChange={e => setTargetFilter(e.target.value)}>
+              <option value="all">全部首答目标</option><option value="g1:met">G1 达到一半</option><option value="g1:below">G1 待巩固</option><option value="g2:met">G2 达到一半</option><option value="g2:below">G2 待巩固</option>
+            </select>
+          </label>
+          <label>探究证据
+            <select aria-label="探究证据" className={control} value={evidenceFilter} onChange={e => setEvidenceFilter(e.target.value)}>
+              <option value="all">全部探究证据</option><option value="recorded">已有证据</option><option value="none">尚无证据</option><option value="revision">有修订记录</option><option value="confirmed">有完成确认</option>
+            </select>
+          </label>
+          <label>概念支持
+            <select aria-label="概念支持" className={control} value={supportFilter} onChange={e => setSupportFilter(e.target.value)}>
+              <option value="all">全部支持状态</option><option value="used">有概念支持记录</option><option value="none">尚无支持记录</option>
+            </select>
+          </label>
+        </div>
+        <div className="g5-teacher-range">
+          {([{ title: '首答分数', range: firstRange, change: setFirstRange }, { title: '最近分数', range: latestRange, change: setLatestRange }]).map(({ title, range, change }) =>
+            <div key={title}><span>{title}</span>
+              <input aria-label={`${title}下限`} className={control} type="number" min={0} max={16} value={range.min} onChange={e => change({ ...range, min: e.target.value })} />
+              <span>至</span>
+              <input aria-label={`${title}上限`} className={control} type="number" min={0} max={16} value={range.max} onChange={e => change({ ...range, max: e.target.value })} />
+            </div>)}
+        </div>
+      </div>
+    </details>
+  );
+
+  return <div className="g5-teacher">
+    <header className="g5-teacher-top">
+      <div className="g5-teacher-top-inner">
+        <div>
+          <p className="g5-teacher-eyebrow">五年级第7课 · 莲花山智慧路口 · 重复操作用循环</p>
+          <h1>教师观察大屏</h1>
+        </div>
+        <div className="g5-teacher-sync">
+          <strong><span aria-hidden="true" data-error={!!loadError} />课堂数据</strong>
+          <p aria-live="polite">{loadError ? '同步遇到问题' : payload ? `更新于 ${formatTime(payload.updatedAt)}` : '等待同步'}</p>
+        </div>
       </div>
     </header>
 
-    <section aria-label="全年级固定概览">
-      <h2 className="text-sm font-semibold mb-2">全年级概览</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
-        {overview.map(([label, count]) => <div key={label} className={panel}><p className="text-sm text-slate-400">{label}</p>
-          <p className="text-xl font-bold text-amber-200 mt-1">{summary ? `${count} / ${total}` : '—'}</p></div>)}
-      </div>
-      <p className="mt-2 text-xs text-slate-400">概览以全年级在册人数为分母。考核达标依据基础首答，挑战另记。</p>
-    </section>
+    <main className="g5-teacher-main">
+      {loadError && <p role="status" className="g5-teacher-notice">课堂数据暂时无法更新。{loadError}。可点击「立即刷新」重试。</p>}
 
-    <section aria-label="筛选与考核管理" className={panel}>
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
-        <select aria-label="班级" className={control} value={selectedClass} onChange={e => { setSelectedClass(e.target.value); setOperationMessage(''); }}>
-          <option value="all">全部班级</option>{classIds.map(id => <option key={id} value={id}>{id} 班</option>)}
-        </select>
-        <input aria-label="学生姓名" className={control} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="搜索姓名" />
-        <select aria-label="考核状态" className={control} value={passFilter} onChange={e => setPassFilter(e.target.value)}>
-          <option value="all">全部考核状态</option><option value="passed">已达标</option><option value="failed">未达标</option><option value="no_record">尚无考核记录</option>
-        </select>
-        <select aria-label="首答目标" className={control} value={targetFilter} onChange={e => setTargetFilter(e.target.value)}>
-          <option value="all">全部首答目标</option><option value="g1:met">G1 达到一半</option><option value="g1:below">G1 待巩固</option><option value="g2:met">G2 达到一半</option><option value="g2:below">G2 待巩固</option>
-        </select>
-        <select aria-label="探究证据" className={control} value={evidenceFilter} onChange={e => setEvidenceFilter(e.target.value)}>
-          <option value="all">全部探究证据</option><option value="recorded">已有证据</option><option value="none">尚无证据</option><option value="revision">有修订记录</option><option value="confirmed">有完成确认</option>
-        </select>
-        <select aria-label="概念支持" className={control} value={supportFilter} onChange={e => setSupportFilter(e.target.value)}>
-          <option value="all">全部支持状态</option><option value="used">有概念支持记录</option><option value="none">尚无支持记录</option>
-        </select>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-3 items-center text-sm">
-        {([{ title: '首答分数', range: firstRange, change: setFirstRange }, { title: '最近分数', range: latestRange, change: setLatestRange }]).map(({ title, range, change }) =>
-          <div key={title} className="flex items-center gap-1"><span>{title}</span>
-            <input aria-label={`${title}下限`} className={`${control} w-16`} type="number" min={0} max={16} value={range.min} onChange={e => change({ ...range, min: e.target.value })} />
-            <span>到</span>
-            <input aria-label={`${title}上限`} className={`${control} w-16`} type="number" min={0} max={16} value={range.max} onChange={e => change({ ...range, max: e.target.value })} />
-          </div>)}
-        <label className="flex items-center gap-2"><input type="checkbox" checked={addSort} onChange={e => setAddSort(e.target.checked)} />叠加排序</label>
-        <button className={button} onClick={() => setSorting([{ field: 'classId', ascending: true }])}>重置排序</button>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <span className="text-sm text-slate-300">{selectedClass === 'all' ? '选择班级查看考核开关' : `${selectedClass} 班考核${payload?.examPauses[selectedClass] ? '已暂停' : '开放'}`}</span>
-        {selectedClass !== 'all' && payload?.canManageExam && <button className={button} disabled={saving} onClick={() => void toggleExam()}>
-          {saving ? '正在保存…' : payload.examPauses[selectedClass] ? '重新开放本班考核' : '暂停本班考核'}
-        </button>}
-        {payload && !payload.canManageExam && <span className="text-xs text-slate-400">考核开关在运行课堂服务的电脑上操作，请打开本机 localhost 教师大屏。</span>}
-        {operationMessage && <span className="text-sm" role="status">{operationMessage}</span>}
-      </div>
-    </section>
+      <section aria-label="班级和课堂管理" className="g5-teacher-card g5-teacher-toolbar">
+        <label>查看班级
+          <select aria-label="班级" className={control} value={selectedClass} onChange={e => { setSelectedClass(e.target.value); setOperationMessage(''); }}>
+            <option value="all">全部班级</option>{classIds.map(id => <option key={id} value={id}>{id} 班</option>)}
+          </select>
+        </label>
+        <div className="g5-teacher-actions">
+          <span className="g5-teacher-badge" data-tone={!isClassSelected || !payload ? 'neutral' : isPaused ? 'warn' : 'ok'}>{examStatus}</span>
+          {isClassSelected && payload?.canManageExam && <button className={button} disabled={saving} onClick={() => void toggleExam()}>
+            {saving ? '正在保存…' : isPaused ? '重新开放本班考核' : '暂停本班考核'}
+          </button>}
+          <button className={button} onClick={() => void refresh()}>立即刷新</button>
+          <a className={button} href={teacherExportUrl(isClassSelected ? selectedClass : undefined)} download>导出课堂 CSV</a>
+          {onBackToApp && <button className={button} onClick={onBackToApp}>返回学生端</button>}
+        </div>
+        {isClassSelected && payload && !payload.canManageExam && <p className="g5-teacher-toolbar-note">考核开关可在运行课堂服务的电脑上操作。<a href={localTeacherUrl.href}>本机教师大屏</a></p>}
+        {operationMessage && <p className="g5-teacher-toolbar-note" role="status">{operationMessage}</p>}
+      </section>
 
-    {(payload || loading) && <RewardLeaderboard entries={payload?.rewardLeaderboard ?? []} selectedClass={selectedClass} pending={!payload} />}
+      <TeacherOverview selectedClass={selectedClass} classRoster={classRoster} rows={overviewRows} filters={filters} />
 
-    <section className={panel} aria-label="筛选结果图表">
-      <h2 className="text-sm font-semibold mb-2">筛选结果 · {rows.length} 人</h2>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">{bars.map(([label, count]) => <div key={label}>
-        <div className="flex justify-between gap-1 text-xs mb-1"><span>{label}</span><span>{count}/{rows.length}</span></div>
-        <div className="h-2 rounded bg-slate-700 overflow-hidden" aria-hidden="true"><div className="h-full bg-sky-500" style={{ width: `${rows.length ? count / rows.length * 100 : 0}%` }}/></div>
-      </div>)}</div>
-    </section>
+      {(payload || loading) && <RewardLeaderboard entries={payload?.rewardLeaderboard ?? []} selectedClass={selectedClass} pending={!payload} />}
 
-    <section aria-label="学生明细" className="overflow-x-auto rounded-xl border border-slate-700">
-      <table className="w-full text-left text-sm min-w-[860px]">
-        <thead className="bg-slate-800 text-slate-300"><tr>
-          {sortHeader('classId', '班级')}{sortHeader('name', '姓名')}<th className="px-3">进入情况</th><th className="px-3">三站</th>
-          {sortHeader('first', '基础首答')}{sortHeader('latest', '基础最近')}<th className="px-3">首答目标</th>
-          <th className="px-3">达标</th><th className="px-3">挑战</th>{sortHeader('support', '法宝')}{sortHeader('lastSync', '最近同步')}<th className="px-3">证据</th>
-        </tr></thead>
-        <tbody className="divide-y divide-slate-800">{rows.map(row => {
-          const first = firstResult(row), latest = recentResult(row);
-          const id = row.student.studentId, open = expanded === id;
-          const secondDone = secondStationDone(row);
-          const completed = [row.stations.s1_order, secondDone, row.stations.s3_timing].filter(Boolean).length;
-          const challenge = row.challengeFirstComplete ? row.challengeFirstResult : null;
-          return <React.Fragment key={id}>
-            <tr className="hover:bg-slate-800/50">
-              <td className="px-3 py-2">{row.student.classId}</td><td className="px-3 font-semibold">{row.student.name}</td>
-              <td className="px-3">{row.entered ? '已进入' : '未进入'}</td>
-              <td className="px-3" title={`第一站${row.stations.s1_order ? '完成' : '尚无完成记录'} · 第二站${secondDone ? '完成' : '尚无完成记录'} · 第三站${row.stations.s3_timing ? '完成' : '尚无完成记录'}`}>{completed} / 3</td>
-              <td className="px-3">{!first && row.incompleteScores?.base !== undefined ? '旧卷未填完整' : scoreLabel(first)}</td><td className="px-3">{scoreLabel(latest)}</td><td className="px-3">{goalLabel(first)}</td>
-              <td className="px-3">{first ? first.passed ? '达标' : '未达标' : '—'}</td>
-              <td className="px-3">{challenge ? `${challenge.challengeScore ?? 0}/${challenge.challengeTotal ?? 6}${challenge.challengePassed ? ' · 加分' : ''}` : '尚无记录'}</td>
-              <td className="px-3">{row.entered ? `${row.relics.used} / 3` : '—'}</td>
-              <td className="px-3 whitespace-nowrap">{formatTime(row.lastSync)}</td>
-              <td className="px-3"><button className="text-sky-300 underline focus:outline focus:outline-2 focus:outline-sky-400" aria-expanded={open} aria-label={`${open ? '收起' : '查看'}${row.student.name}明细`} onClick={() => setExpanded(open ? null : id)}>{open ? '收起' : '明细'}</button></td>
-            </tr>
-            {open && <tr><td colSpan={12} className="px-3 py-2 bg-slate-800"><PupilEvidence row={row} evidence={evidenceByPupil.get(id) || []}/></td></tr>}
-          </React.Fragment>;
-        })}
-        {!rows.length && <tr><td className="p-4 text-center text-slate-400" colSpan={12}>{loading ? '正在加载' : '暂无符合条件的记录'}</td></tr>}</tbody>
-      </table>
-    </section>
+      <section aria-labelledby="g5-student-records" className="g5-teacher-card g5-teacher-students">
+        <div className="g5-teacher-section-head">
+          <div><p className="g5-teacher-eyebrow">学生明细</p><h2 id="g5-student-records">当前课堂记录</h2></div>
+          <p>点击列名切换升降序，展开明细查看各站证据。</p>
+        </div>
+        <div className="g5-teacher-sort-row">
+          <span>排序 {sorting.map(({ field, ascending }) => `${sortLabels[field]}${ascending ? ' ↑' : ' ↓'}`).join(' → ')}</span>
+          <label><input type="checkbox" checked={addSort} onChange={e => setAddSort(e.target.checked)} />叠加排序</label>
+          <button className="g5-teacher-sort" onClick={() => setSorting(defaultSorting)}>重置排序</button>
+        </div>
+        <div className="g5-teacher-table-wrap" role="region" aria-label="学生明细表" tabIndex={0}>
+          <table className="g5-teacher-table">
+            <thead><tr>
+              {sortHeader('classId')}{sortHeader('name')}<th scope="col">进入情况</th><th scope="col">三站</th>
+              {sortHeader('first')}{sortHeader('latest')}<th scope="col">首答目标</th>
+              <th scope="col">达标</th><th scope="col">挑战</th>{sortHeader('support')}{sortHeader('lastSync')}<th scope="col">证据</th>
+            </tr></thead>
+            <tbody>{rows.map(row => {
+              const first = firstResult(row), latest = recentResult(row);
+              const id = row.student.studentId, open = expanded === id;
+              const [s1, s2, s3] = stationFlags(row);
+              const completed = [s1, s2, s3].filter(Boolean).length;
+              const challenge = row.challengeFirstComplete ? row.challengeFirstResult : null;
+              return <React.Fragment key={id}>
+                <tr data-absent={!row.entered}>
+                  <td>{row.student.classId}</td><th scope="row">{row.student.name}</th>
+                  <td><span className="g5-teacher-badge" data-tone={row.entered ? 'ok' : 'neutral'}>{row.entered ? '已进入' : '未进入'}</span></td>
+                  <td title={`第一站${s1 ? '完成' : '尚无完成记录'} · 第二站${s2 ? '完成' : '尚无完成记录'} · 第三站${s3 ? '完成' : '尚无完成记录'}`}><strong className="g5-teacher-count">{completed}</strong> / 3</td>
+                  <td>{!first && row.incompleteScores?.base !== undefined ? '旧卷未填完整' : scoreLabel(first)}</td><td>{scoreLabel(latest)}</td><td>{goalLabel(first)}</td>
+                  <td>{first ? <span className="g5-teacher-badge" data-tone={first.passed ? 'ok' : 'warn'}>{first.passed ? '达标' : '未达标'}</span> : '—'}</td>
+                  <td>{challenge ? `${challenge.challengeScore ?? 0}/${challenge.challengeTotal ?? 6}${challenge.challengePassed ? ' · 加分' : ''}` : '尚无记录'}</td>
+                  <td>{row.entered ? `${row.relics.used} / 3` : '—'}</td>
+                  <td>{formatTime(row.lastSync)}</td>
+                  <td><button className="g5-teacher-evidence-button" aria-expanded={open} aria-label={`${open ? '收起' : '查看'}${row.student.name}明细`} onClick={() => setExpanded(open ? null : id)}>{open ? '收起证据' : '查看证据'}</button></td>
+                </tr>
+                {open && <tr className="g5-teacher-evidence-row"><td colSpan={12}><PupilEvidence row={row} evidence={evidenceByPupil.get(id) || []}/></td></tr>}
+              </React.Fragment>;
+            })}
+            {!rows.length && <tr><td className="g5-teacher-empty" colSpan={12}>{loading && !payload ? '正在加载' : loadError && !payload ? '课堂数据尚未获取' : '暂无符合条件的记录'}</td></tr>}</tbody>
+          </table>
+        </div>
+        <p className="g5-teacher-footnote">未提交基础考核的学生排在有成绩者之后。必做探究与选做记录在明细中分别显示。</p>
+      </section>
+    </main>
   </div>;
 };
