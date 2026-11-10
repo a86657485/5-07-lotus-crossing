@@ -75,7 +75,7 @@ function ReadonlyFigure({ figure, title, name }: { figure: Figure; title?: strin
   return <div className="question-figure-card" data-figure-name={name}>
     {title && <div className="question-figure-title">{title}</div>}
     <div className="question-figure-canvas" data-readonly-diagram="true" role="img" aria-label={`${title || '题中'}流程图`}>
-      <FlowDiagram nodes={figure.nodes} edges={figure.edges} label={`${title || '题中'}流程图`}/>
+      <FlowDiagram nodes={figure.nodes} edges={figure.edges} label={`${title || '题中'}流程图`} fitPadding={0.08}/>
     </div>
     {figure.note && <p className="question-figure-note">{figure.note}</p>}
   </div>;

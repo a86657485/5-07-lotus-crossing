@@ -1,13 +1,13 @@
 {
-  "startedAtShanghai": "2026-11-10T12:22:13+08:00 Asia/Shanghai",
+  "startedAtShanghai": "2026-11-10T12:35:24+08:00 Asia/Shanghai",
   "base": "http://192.168.0.14:18997",
-  "commit": "e873bd4-wip",
+  "commit": "a1dc935-wip",
   "dataDir": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/tmp-data",
   "checks": [
     {
       "name": "login",
       "passed": true,
-      "detail": "manual-1d9cb1b91bb85fe6401d555e"
+      "detail": "manual-3e8bb4f8a0c24f2f193862d9"
     },
     {
       "name": "map-visible",
@@ -32,22 +32,22 @@
     {
       "name": "layout-B01-1440x900",
       "passed": true,
-      "detail": "{\"q\":\"B01\",\"type\":\"recall\",\"fill\":0.791,\"visualH\":696,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s1_queue.png\",\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"B01\",\"type\":\"recall\",\"fill\":0.791,\"visualH\":696,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":292,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s1_queue.png\",\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-B01-1366x768",
       "passed": true,
-      "detail": "{\"q\":\"B01\",\"type\":\"recall\",\"fill\":0.766,\"visualH\":572,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s1_queue.png\",\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"B01\",\"type\":\"recall\",\"fill\":0.766,\"visualH\":572,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":255,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s1_queue.png\",\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-B08-1440x900",
       "passed": true,
-      "detail": "{\"q\":\"B08\",\"type\":\"figure\",\"fill\":0.791,\"visualH\":696,\"canvasH\":633,\"gapBelowFooter\":19,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"B08\",\"type\":\"figure\",\"fill\":0.791,\"visualH\":696,\"canvasH\":633,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":305,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-B08-1366x768",
       "passed": true,
-      "detail": "{\"q\":\"B08\",\"type\":\"figure\",\"fill\":0.766,\"visualH\":572,\"canvasH\":509,\"gapBelowFooter\":15,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"B08\",\"type\":\"figure\",\"fill\":0.766,\"visualH\":572,\"canvasH\":509,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":255,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "submit-base-for-challenge",
@@ -62,32 +62,32 @@
     {
       "name": "layout-C01-1440x900",
       "passed": true,
-      "detail": "{\"q\":\"C01\",\"type\":\"figure\",\"fill\":0.72,\"visualH\":632,\"canvasH\":606,\"gapBelowFooter\":19,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"C01\",\"type\":\"figure\",\"fill\":0.72,\"visualH\":632,\"canvasH\":606,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":273,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-C01-1366x768",
       "passed": true,
-      "detail": "{\"q\":\"C01\",\"type\":\"figure\",\"fill\":0.688,\"visualH\":512,\"canvasH\":486,\"gapBelowFooter\":15,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"C01\",\"type\":\"figure\",\"fill\":0.688,\"visualH\":512,\"canvasH\":486,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":225,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-C03-1440x900",
       "passed": true,
-      "detail": "{\"q\":\"C03\",\"type\":\"recall\",\"fill\":0.72,\"visualH\":632,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s3_booth.png\",\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"C03\",\"type\":\"recall\",\"fill\":0.72,\"visualH\":632,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":273,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s3_booth.png\",\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-C03-1366x768",
       "passed": true,
-      "detail": "{\"q\":\"C03\",\"type\":\"recall\",\"fill\":0.688,\"visualH\":512,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s3_booth.png\",\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"C03\",\"type\":\"recall\",\"fill\":0.688,\"visualH\":512,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":225,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s3_booth.png\",\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-C05-1440x900",
       "passed": true,
-      "detail": "{\"q\":\"C05\",\"type\":\"recall\",\"fill\":0.72,\"visualH\":632,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_exam_ready.png\",\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"C05\",\"type\":\"recall\",\"fill\":0.72,\"visualH\":632,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":55,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_exam_ready.png\",\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "layout-C05-1366x768",
       "passed": true,
-      "detail": "{\"q\":\"C05\",\"type\":\"recall\",\"fill\":0.688,\"visualH\":512,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_exam_ready.png\",\"stemInView\":true,\"footerInView\":true}"
+      "detail": "{\"q\":\"C05\",\"type\":\"recall\",\"fill\":0.688,\"visualH\":512,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":40,\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_exam_ready.png\",\"stemInView\":true,\"footerInView\":true}"
     },
     {
       "name": "pageErrors-empty",
@@ -268,11 +268,13 @@
       "workspaceFillRatio": 0.791,
       "optionCount": 4,
       "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 292,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "B01-1440x900",
-      "at": "2026-11-10T12:22:21+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:31+08:00 Asia/Shanghai"
     },
     {
       "vw": 1366,
@@ -308,11 +310,13 @@
       "workspaceFillRatio": 0.766,
       "optionCount": 4,
       "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 255,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "B01-1366x768",
-      "at": "2026-11-10T12:22:21+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:31+08:00 Asia/Shanghai"
     },
     {
       "vw": 1440,
@@ -348,11 +352,13 @@
       "workspaceFillRatio": 0.791,
       "optionCount": 2,
       "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 305,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "B08-1440x900",
-      "at": "2026-11-10T12:22:23+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:33+08:00 Asia/Shanghai"
     },
     {
       "vw": 1366,
@@ -388,11 +394,13 @@
       "workspaceFillRatio": 0.766,
       "optionCount": 2,
       "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 255,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "B08-1366x768",
-      "at": "2026-11-10T12:22:24+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:34+08:00 Asia/Shanghai"
     },
     {
       "vw": 1440,
@@ -428,11 +436,13 @@
       "workspaceFillRatio": 0.72,
       "optionCount": 4,
       "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 273,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "C01-1440x900",
-      "at": "2026-11-10T12:22:25+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:35+08:00 Asia/Shanghai"
     },
     {
       "vw": 1366,
@@ -468,11 +478,13 @@
       "workspaceFillRatio": 0.688,
       "optionCount": 4,
       "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 225,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "C01-1366x768",
-      "at": "2026-11-10T12:22:26+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:36+08:00 Asia/Shanghai"
     },
     {
       "vw": 1440,
@@ -508,11 +520,13 @@
       "workspaceFillRatio": 0.72,
       "optionCount": 4,
       "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 273,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "C03-1440x900",
-      "at": "2026-11-10T12:22:26+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:37+08:00 Asia/Shanghai"
     },
     {
       "vw": 1366,
@@ -548,11 +562,13 @@
       "workspaceFillRatio": 0.688,
       "optionCount": 4,
       "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 225,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "C03-1366x768",
-      "at": "2026-11-10T12:22:27+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:37+08:00 Asia/Shanghai"
     },
     {
       "vw": 1440,
@@ -588,11 +604,13 @@
       "workspaceFillRatio": 0.72,
       "optionCount": 6,
       "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 55,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "C05-1440x900",
-      "at": "2026-11-10T12:22:28+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:38+08:00 Asia/Shanghai"
     },
     {
       "vw": 1366,
@@ -628,14 +646,16 @@
       "workspaceFillRatio": 0.688,
       "optionCount": 6,
       "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 40,
       "unselectedYellow": [],
       "overflowY": 0,
       "promptScroll": 0,
       "label": "C05-1366x768",
-      "at": "2026-11-10T12:22:28+08:00 Asia/Shanghai"
+      "at": "2026-11-10T12:35:38+08:00 Asia/Shanghai"
     }
   ],
   "notes": [],
-  "studentId": "manual-1d9cb1b91bb85fe6401d555e",
-  "fakeName": "版式QA_1794284534376"
+  "studentId": "manual-3e8bb4f8a0c24f2f193862d9",
+  "fakeName": "版式QA_1794285324702"
 }

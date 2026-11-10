@@ -4,7 +4,7 @@ import '@xyflow/react/dist/style.css';
 
 export type DiagramNode = { id: string; label: string; kind: 'start' | 'process' | 'decision'; x: number; y: number; empty?: boolean; branches?: boolean };
 export type DiagramEdge = { id: string; from: string; to: string; branch?: 'yes' | 'no'; label?: string; back?: boolean };
-type Props = { nodes: DiagramNode[]; edges: DiagramEdge[]; activeNode?: string; nextNodeId?: string; selectedEdge?: string; selectedBranch?: string; onNodeSelect?: (id: string) => void; onPortSelect?: (port: 'yes' | 'no') => void; onEdgeSelect?: (id: string) => void; label?: string };
+type Props = { nodes: DiagramNode[]; edges: DiagramEdge[]; activeNode?: string; nextNodeId?: string; selectedEdge?: string; selectedBranch?: string; onNodeSelect?: (id: string) => void; onPortSelect?: (port: 'yes' | 'no') => void; onEdgeSelect?: (id: string) => void; label?: string; fitPadding?: number };
 
 function LessonNode({ data }: NodeProps) {
   const d = data as any;
@@ -48,6 +48,8 @@ const edgeTypes = { lesson: LessonEdge };
 export default function FlowDiagram(props: Props) {
   const container = useRef<HTMLDivElement>(null);
   const fit = useRef<() => void>(() => {});
+  const fitPadding = useRef(props.fitPadding ?? 0.18);
+  fitPadding.current = props.fitPadding ?? 0.18;
   const layoutKey = props.nodes.map(n => `${n.id}:${n.kind}:${n.x}:${n.y}`).join('|');
   useEffect(() => {
     let frame = 0;
@@ -64,10 +66,10 @@ export default function FlowDiagram(props: Props) {
       secondFrame = window.requestAnimationFrame(() => fit.current());
     });
     return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(secondFrame); };
-  }, [layoutKey]);
+  }, [layoutKey, props.fitPadding]);
   const nodes = useMemo(() => props.nodes.map(n => ({ id: n.id, type: 'lesson', position: { x: n.x, y: n.y }, data: { ...n, active: props.activeNode === n.id, selectable: !!props.onNodeSelect, selectedBranch: props.selectedBranch, onPort: props.onPortSelect }, width: n.kind === 'decision' ? 240 : 200, height: n.kind === 'decision' ? 100 : 54, draggable: false })), [props.nodes, props.activeNode, props.onNodeSelect, props.onPortSelect, props.selectedBranch]);
   const edges = useMemo(() => props.edges.map(e => ({ id: e.id, type: 'lesson', source: e.from, target: e.to, sourceHandle: e.branch || 'bottom', targetHandle: e.back ? 'left' : 'top', label: e.label, markerEnd: { type: MarkerType.ArrowClosed, color: props.selectedEdge === e.id ? '#f58b20' : '#367abd' }, data: { back: e.back, selected: props.selectedEdge === e.id }, animated: props.activeNode === e.from && props.nextNodeId === e.to })), [props.edges, props.selectedEdge, props.activeNode, props.nextNodeId]);
   return <div ref={container} className="lesson-flow" aria-label={props.label || '可操作流程图'}>
-    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onInit={instance => { fit.current = () => { void instance.fitView({ padding: .18, duration: 0 }); }; fit.current(); }} fitView fitViewOptions={{ padding: .18 }} minZoom={.25} maxZoom={1.1} nodesDraggable={false} nodesConnectable={false} panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnDoubleClick={false} zoomOnPinch={false} elementsSelectable={false} onNodeClick={(_, node) => props.onNodeSelect?.(node.id)} onEdgeClick={(_, edge) => props.onEdgeSelect?.(edge.id)} preventScrolling={false} />
+    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onInit={instance => { fit.current = () => { void instance.fitView({ padding: fitPadding.current, duration: 0 }); }; fit.current(); }} fitView fitViewOptions={{ padding: props.fitPadding ?? 0.18 }} minZoom={.25} maxZoom={1.1} nodesDraggable={false} nodesConnectable={false} panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnDoubleClick={false} zoomOnPinch={false} elementsSelectable={false} onNodeClick={(_, node) => props.onNodeSelect?.(node.id)} onEdgeClick={(_, edge) => props.onEdgeSelect?.(edge.id)} preventScrolling={false} />
   </div>;
 }

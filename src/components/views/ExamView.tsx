@@ -132,7 +132,7 @@ function AnswerCards({
           </span>
         </div>
       )}
-      <div className="exam-options">
+      <div className={`exam-options exam-options-${(question.options || question.cards || []).length}`}>
         {(question.options || question.cards || []).map(option => {
           const selected = slot ? picked === option : placed === option;
           return <button

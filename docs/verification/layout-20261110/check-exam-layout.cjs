@@ -167,6 +167,13 @@ function isYellowish(color) {
           const r = o.getBoundingClientRect();
           return r.height > 0 && r.top >= -4 && r.bottom <= vh + 4;
         }),
+        gapBelowOptions: (() => {
+          const area = document.querySelector('.exam-answers') || document.querySelector('.exam-prompt');
+          if (!area || !options.length) return null;
+          const last = options[options.length - 1].getBoundingClientRect();
+          return Math.max(0, Math.round(area.getBoundingClientRect().bottom - last.bottom));
+        })(),
+        optionMinHeight: options.length ? Math.round(Math.min(...options.map((o) => o.getBoundingClientRect().height))) : null,
         unselectedYellow,
         overflowY: document.documentElement.scrollHeight - vh,
         promptScroll: prompt ? Math.max(0, prompt.scrollHeight - prompt.clientHeight) : 0,
@@ -182,9 +189,10 @@ function isYellowish(color) {
     const visualTall = metrics.visual && metrics.visual.height >= (metrics.vh >= 860 ? 360 : 260);
     const noLeak = (metrics.unselectedYellow || []).length === 0;
     const oneScreen = metrics.stemInView && metrics.footerInView && metrics.visualInView && metrics.optionsInView && metrics.promptScroll <= 24;
+    const optionsFill = metrics.gapBelowOptions === null || metrics.gapBelowOptions <= 28;
     const figureOk = metrics.visualType !== 'figure' || (metrics.canvasH && metrics.canvasH >= (metrics.vh >= 860 ? 300 : 220));
     const recallOk = metrics.visualType !== 'recall' || metrics.recallLoaded === true;
-    const pass = tightFooter && filled && visualTall && noLeak && oneScreen && figureOk && recallOk && metrics.overflowY <= 8;
+    const pass = tightFooter && filled && visualTall && noLeak && oneScreen && optionsFill && figureOk && recallOk && metrics.overflowY <= 8;
     const detail = JSON.stringify({
       q: metrics.question,
       type: metrics.visualType,
@@ -193,6 +201,8 @@ function isYellowish(color) {
       canvasH: metrics.canvasH,
       gapBelowFooter: metrics.gapBelowFooter,
       promptScroll: metrics.promptScroll,
+      gapBelowOptions: metrics.gapBelowOptions,
+      optionMinHeight: metrics.optionMinHeight,
       overflowY: metrics.overflowY,
       unselectedYellow: metrics.unselectedYellow,
       recallSrc: metrics.recallSrc,
