@@ -17,3 +17,6 @@ godot/project/.godot/
 docs/screenshots/*.wav
 
 .certs/
+
+# 预压缩产物（npm run build 生成，不入库）
+*.gz
