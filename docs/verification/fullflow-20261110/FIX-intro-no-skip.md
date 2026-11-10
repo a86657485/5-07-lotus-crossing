@@ -15,7 +15,24 @@
 
 ## 分支 / PR
 - 分支：`fix/g5l7-intro-no-skip`
-- 不合 main（须老师再确认）
+- commit：`59f7dbd6b36c`（`59f7dbd6b36c1b8efe61905d40b1b487b5879f86`）
+- Draft PR：https://github.com/a86657485/5-07-lotus-crossing/pull/6
+- **不合 main**（须老师再确认）
 
-## 部署
-见本文件提交后的回告：8797 是否已更新到本 tip。
+## 部署（本机课堂 8797）
+- 已更新到 tip release：`/Users/jun/.local/share/classroom-apps/5-07-lotus-crossing/releases/59f7dbd6b36c`
+- 学生／教师入口 HTTP 200；bundle `assets/index-DLzUmM0u.js`
+- 未合 main，仅 tip 部署便于立刻验收
+
+## 复测（最小化 Playwright，BASE `http://192.168.0.14:8797`）
+脚本：`retest-intro-no-skip.cjs` → **PASS 5/5**
+
+| 项 | 结果 |
+|---|---|
+| first-view-close-hidden | PASS（closeCount=0） |
+| first-view-esc-noop | PASS |
+| first-view-complete-enters-map | PASS |
+| replay-close-works | PASS |
+| replay-esc-works | PASS |
+
+报告：`retest-intro-no-skip-report.json`（完成约 2026-11-10 09:26 Asia/Shanghai）
