@@ -44,8 +44,10 @@ export default function WebLessonPlayView(props: LessonHostProps) {
     setStory({ kind, cursor: 0, after, replay });
   }
 
+  /** First-view stories (replay===false) must advance via 下句/好的; only replay may close/Esc. */
   function finishStory(skipped = false) {
     if (!story) return;
+    if (skipped && !story.replay) return;
     const current = story;
     setStory(null);
     if (current.recordIntro) {
@@ -58,7 +60,12 @@ export default function WebLessonPlayView(props: LessonHostProps) {
   }
 
   useEffect(() => {
-    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape' && story) { event.preventDefault(); finishStory(true); } };
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !story) return;
+      if (!story.replay) return;
+      event.preventDefault();
+      finishStory(true);
+    };
     window.addEventListener('keydown', dismiss);
     return () => window.removeEventListener('keydown', dismiss);
   });
@@ -116,7 +123,7 @@ export default function WebLessonPlayView(props: LessonHostProps) {
     </div>
     <footer className="story-map-footer"><span>原剧情随时可以回看</span>{props.examOpen && !allDone && <button className="story-map-replay" onClick={props.onExamOpen}>继续检测</button>}<span>法宝 {props.relics.remaining}/3 · 进度自动保存</span></footer>
     {station && <StationPanel key={`${station}-${panelRevision}`} station={station} studentId={props.student.studentId} initialS3={props.s3State} initialEvidence={props.evidenceHistory} freshStart={freshStart} resetId={resetIds.current[station]} relicRemaining={props.relics.remaining} onUseRelic={props.onRelicUse} onEvidence={event => { if (event.eventType === 'current_invalidated') setOverrides(old => ({ ...old, [station]: false })); props.onEvidence(event); }} onCancel={() => setStation(null)} onRestart={restartStation} onComplete={completeStation}/>}
-    {story && <div className="web-story-backdrop"><section className="web-story" role="dialog" aria-modal="true" aria-labelledby="web-story-title"><header><span id="web-story-title">{stories[story.kind].title}{story.replay ? ' · 回放' : ''}</span><button onClick={() => finishStory(true)} aria-label="关闭剧情"><X size={25}/></button></header><div className="web-story-picture"><img src={`/lesson/story/${stories[story.kind].image}`} alt={stories[story.kind].title}/></div><div className="web-story-dialogue"><span className="web-story-speaker">{stories[story.kind].lines[story.cursor][0]}</span><p>{stories[story.kind].lines[story.cursor][1]}</p><div className="web-story-controls"><span>{story.cursor + 1}/{stories[story.kind].lines.length}</span><button onClick={() => story.cursor < stories[story.kind].lines.length - 1 ? setStory({ ...story, cursor: story.cursor + 1 }) : finishStory()}>{story.cursor < stories[story.kind].lines.length - 1 ? '下句' : '好的'}<ArrowRight size={21}/></button></div></div></section></div>}
+    {story && <div className="web-story-backdrop"><section className="web-story" role="dialog" aria-modal="true" aria-labelledby="web-story-title"><header><span id="web-story-title">{stories[story.kind].title}{story.replay ? ' · 回放' : ''}</span>{story.replay ? <button onClick={() => finishStory(true)} aria-label="关闭剧情"><X size={25}/></button> : null}</header><div className="web-story-picture"><img src={`/lesson/story/${stories[story.kind].image}`} alt={stories[story.kind].title}/></div><div className="web-story-dialogue"><span className="web-story-speaker">{stories[story.kind].lines[story.cursor][0]}</span><p>{stories[story.kind].lines[story.cursor][1]}</p><div className="web-story-controls"><span>{story.cursor + 1}/{stories[story.kind].lines.length}</span><button onClick={() => story.cursor < stories[story.kind].lines.length - 1 ? setStory({ ...story, cursor: story.cursor + 1 }) : finishStory()}>{story.cursor < stories[story.kind].lines.length - 1 ? '下句' : '好的'}<ArrowRight size={21}/></button></div></div></section></div>}
   </main>;
 }
 
