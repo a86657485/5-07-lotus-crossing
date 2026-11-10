@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { apiLogin, apiRecordTrainReward, apiReportEvidence, apiSaveProgress, apiSubmitExam, retryPendingTrainRewards } from './client';
 import type { TrainResultInput } from '../lesson/trainReward';
@@ -76,3 +76,49 @@ test('an offline train best stays with its student and retries without replacing
   assert.deepEqual(sent, [{ studentId: 'student-a', ...best }, { studentId: 'student-a', ...next }]);
   assert.equal(stored.size, 0);
 });
+
+test('train reward aborts hung requests with AbortController, not AbortSignal.timeout', async t => {
+  const originalFetch = globalThis.fetch;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const stored = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => stored.set(key, value),
+    removeItem: (key: string) => stored.delete(key),
+  } });
+  mock.timers.enable({ apis: ['setTimeout'], now: 0 });
+  t.after(() => {
+    mock.timers.reset();
+    globalThis.fetch = originalFetch;
+    if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  let seenSignal: AbortSignal | undefined;
+  globalThis.fetch = async (_url, init) => {
+    if (String(_url).includes('/api/login')) {
+      return Response.json({ sessionToken: 'timeout-token', state: {}, student: {} });
+    }
+    seenSignal = init?.signal;
+    assert.ok(seenSignal, 'request must pass AbortController signal');
+    // 故意挂起，等待项目的 AbortController + setTimeout 超时
+    await new Promise<never>((_resolve, reject) => {
+      seenSignal!.addEventListener('abort', () => {
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      }, { once: true });
+    });
+    return Response.json({ bestLaps: 1 });
+  };
+
+  await apiLogin({ classId: '501', studentId: 'student-timeout' });
+  const submission: TrainResultInput = {
+    orderIndex: 0,
+    rule: 'three',
+    route: ['water', 'water', 'tools'],
+  };
+  const pending = apiRecordTrainReward('student-timeout', submission);
+  mock.timers.tick(8000);
+  await assert.rejects(pending, /abort/i);
+  assert.ok(seenSignal?.aborted, 'signal should be aborted after timeout');
+});
+

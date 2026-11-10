@@ -136,6 +136,8 @@ export function RewardLoopGame({ onBackToMap, onRecordResult }: RewardLoopGamePr
   const [lateLap, setLateLap] = useState<number | null>(null);
   const [recordStatus, setRecordStatus] = useState<RecordStatus>({ status: 'idle' });
   const recordInFlight = useRef(false);
+  /** 切单／重玩时递增，忽略上一单迟到回执，避免覆盖当前结算态 */
+  const recordEpoch = useRef(0);
   const switchButton = useRef<HTMLButtonElement>(null);
   const helpButton = useRef<HTMLButtonElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
@@ -160,16 +162,22 @@ export function RewardLoopGame({ onBackToMap, onRecordResult }: RewardLoopGamePr
   const nextStep = result ? '回库' : leavingCheck ? '再跑一圈' : '再跑或回库';
   const minimumLaps = order.water + order.tools;
   const reachedLapLimit = result === 'short' && rule === 'fulfilled';
-  const waitingForReceipt = result === 'filled' && (recordStatus.status === 'idle' || recordStatus.status === 'saving');
+  const waitingForReceipt = result === 'filled' && (
+    recordStatus.status === 'idle' || recordStatus.status === 'saving'
+  );
 
   const saveResult = useCallback(async () => {
     if (recordInFlight.current) return;
+    const epoch = recordEpoch.current;
     recordInFlight.current = true;
     setRecordStatus({ status: 'saving' });
     try {
       const { bestLaps } = await onRecordResult({ orderIndex, rule, route });
+      // 提交确认前若已切单／重玩，丢弃迟到回执，避免覆盖下一单状态
+      if (epoch !== recordEpoch.current) return;
       setRecordStatus({ status: 'saved', bestLaps });
     } catch {
+      if (epoch !== recordEpoch.current) return;
       setRecordStatus({ status: 'failed' });
     } finally {
       recordInFlight.current = false;
@@ -185,8 +193,13 @@ export function RewardLoopGame({ onBackToMap, onRecordResult }: RewardLoopGamePr
     if (phase === 'done') resultHeading.current?.focus();
   }, [phase, completedRounds]);
 
-  function setup(orderIndex: TrainOrderIndex, nextRule: TrainRule) {
-    dispatch({ type: 'setup', orderIndex, rule: nextRule });
+  function setup(nextOrderIndex: TrainOrderIndex, nextRule: TrainRule) {
+    // 成功结算且成绩尚未确认时，禁止重玩／下一单，避免上一单回执覆盖下一单
+    if (result === 'filled' && (recordStatus.status === 'idle' || recordStatus.status === 'saving' || recordInFlight.current)) {
+      return;
+    }
+    recordEpoch.current += 1;
+    dispatch({ type: 'setup', orderIndex: nextOrderIndex, rule: nextRule });
     setLateLap(null);
     setRecordStatus({ status: 'idle' });
     if (isDone) requestAnimationFrame(() => startButton.current?.focus());

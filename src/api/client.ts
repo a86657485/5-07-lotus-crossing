@@ -23,6 +23,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+/** AbortController + setTimeout：兼容机房旧版 Chrome（勿用 AbortSignal.timeout） */
+async function requestWithTimeout<T>(path: string, init: RequestInit, ms = 8000): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  try {
+    return await request<T>(path, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export type ServerState = StudentSessionRecord & {
   examOpen?: boolean;
   examPaused?: boolean;
@@ -75,17 +86,10 @@ export async function apiSaveProgress(
 }
 
 export async function apiUseRelic(studentId: string, eventId = makeEventId('relic')): Promise<{ student: Student; state: ServerState }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    return await request('/api/relic', {
-      method: 'POST',
-      body: JSON.stringify({ studentId, eventId }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
+  return requestWithTimeout('/api/relic', {
+    method: 'POST',
+    body: JSON.stringify({ studentId, eventId }),
+  });
 }
 
 export async function apiReportEvidence(
@@ -135,23 +139,16 @@ export async function apiRecordTrainReward(studentId: string, submission: TrainR
   if (!usePending) {
     try { localStorage.setItem(key, JSON.stringify(submission)); } catch { /* Try the server without a local copy. */ }
   }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const result = await request<{ bestLaps: number }>('/api/reward/train/result', {
-      method: 'POST',
-      body: JSON.stringify({ studentId, orderIndex, rule, route }),
-      keepalive: true,
-      signal: controller.signal,
-    });
-    const remaining = readPendingTrainReward(key, orderIndex);
-    if (remaining && result.bestLaps <= remaining.route.length) {
-      try { localStorage.removeItem(key); } catch { /* Sending the same result again is safe. */ }
-    }
-    return result;
-  } finally {
-    clearTimeout(timeout);
+  const result = await requestWithTimeout<{ bestLaps: number }>('/api/reward/train/result', {
+    method: 'POST',
+    body: JSON.stringify({ studentId, orderIndex, rule, route }),
+    keepalive: true,
+  });
+  const remaining = readPendingTrainReward(key, orderIndex);
+  if (remaining && result.bestLaps <= remaining.route.length) {
+    try { localStorage.removeItem(key); } catch { /* Sending the same result again is safe. */ }
   }
+  return result;
 }
 
 export function retryPendingTrainRewards(studentId: string) {
