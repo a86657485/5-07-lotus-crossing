@@ -81,6 +81,10 @@ function ReadonlyFigure({ figure, title, name }: { figure: Figure; title?: strin
   </div>;
 }
 
+export function hasQuestionFigure(question: QuestionClient): boolean {
+  return question.id === 'B08' || question.id === 'C02' || !!singleFigure(question);
+}
+
 /** Assessment figures are read-only and deliberately carry no selection or correctness styles. */
 export default function QuestionFigure({ question, filledAnswer }: { question: QuestionClient; filledAnswer?: string }) {
   if (question.id === 'B08' || question.id === 'C02') {
