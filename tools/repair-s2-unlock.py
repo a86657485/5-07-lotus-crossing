@@ -30,7 +30,7 @@ def main():
     con = sqlite3.connect(DB, timeout=20)
     con.execute('PRAGMA foreign_keys=ON')
     cur = con.cursor()
-    students = {r[0]: {'name': r[1], 'classId': r[2], 'manual': r[3]}
+    students = {r[0]: {'name': r[2], 'classId': r[1], 'manual': r[3]}
                 for r in cur.execute('SELECT id,classId,name,manual FROM students')}
 
     ev = collections.defaultdict(list)
