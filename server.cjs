@@ -619,7 +619,13 @@ function createService(options = {}) {
       if (/-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(rel)) return 'public, max-age=31536000, immutable';
       return 'public, max-age=86400';
     }
-    if (/\/(?:godot|lesson)\//.test(rel)) return 'public, max-age=86400';
+    if (/\/(?:godot|lesson)\//.test(rel)) {
+      // Godot 大包体积大、内容随版本固定，可缓存一天；
+      // 但入口脚本与 HTML 会随缺陷修复更新（如 classroom_bridge.js），必须每次协商，
+      // 否则学生继续用缓存里的旧脚本，修复等于没生效。
+      if (/\.(?:js|html)$/i.test(rel)) return 'no-cache';
+      return 'public, max-age=86400';
+    }
     return 'no-cache';
   }
 
