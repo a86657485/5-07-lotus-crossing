@@ -33,33 +33,43 @@ func _build_theme() -> void:
 	app_theme.set_font("normal_font", "RichTextLabel", ui_font)
 	app_theme.set_font("bold_font", "RichTextLabel", ui_font)
 	app_theme.set_font_size("normal_font_size", "RichTextLabel", 18)
+	for type_name in ["Label", "RichTextLabel", "LineEdit", "TextEdit", "CheckBox", "OptionButton"]:
+		app_theme.set_color("font_color", type_name, Color("233D5A"))
+	app_theme.set_color("default_color", "RichTextLabel", Color("233D5A"))
 	# 按钮可点区域更大（触控）
 	var sep := StyleBoxFlat.new()
-	sep.bg_color = Color("334155")
-	sep.set_corner_radius_all(8)
+	sep.bg_color = Color("E2F1FF")
+	sep.border_color = Color("86B5DF")
+	sep.set_border_width_all(2)
+	sep.set_corner_radius_all(14)
 	sep.content_margin_left = 12
 	sep.content_margin_right = 12
 	sep.content_margin_top = 8
 	sep.content_margin_bottom = 8
 	app_theme.set_stylebox("normal", "Button", sep)
 	var hover := sep.duplicate() as StyleBoxFlat
-	hover.bg_color = Color("475569")
+	hover.bg_color = Color("C7E3FA")
 	app_theme.set_stylebox("hover", "Button", hover)
 	var pressed := sep.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color("F97316")
+	pressed.bg_color = Color("FFD49B")
 	app_theme.set_stylebox("pressed", "Button", pressed)
-	app_theme.set_color("font_color", "Button", Color(0.95, 0.97, 1.0))
-	app_theme.set_color("font_hover_color", "Button", Color(1, 1, 1))
-	app_theme.set_color("font_pressed_color", "Button", Color(1, 1, 1))
+	app_theme.set_color("font_color", "Button", Color("233D5A"))
+	app_theme.set_color("font_hover_color", "Button", Color("233D5A"))
+	app_theme.set_color("font_pressed_color", "Button", Color("233D5A"))
+	app_theme.set_color("font_disabled_color", "Button", Color("6E7E8B"))
+	var disabled := sep.duplicate() as StyleBoxFlat
+	disabled.bg_color = Color("E5EAEF")
+	disabled.border_color = Color("BCC9D3")
+	app_theme.set_stylebox("disabled", "Button", disabled)
 	# Panel
 	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color(0.08, 0.12, 0.2, 0.94)
-	panel.set_corner_radius_all(12)
+	panel.bg_color = Color("FFF9ED")
+	panel.set_corner_radius_all(22)
 	panel.content_margin_left = 16
 	panel.content_margin_right = 16
 	panel.content_margin_top = 14
 	panel.content_margin_bottom = 14
-	panel.border_color = Color("F59E0B")
+	panel.border_color = Color("75AFE0")
 	panel.border_width_left = 2
 	panel.border_width_top = 2
 	panel.border_width_right = 2

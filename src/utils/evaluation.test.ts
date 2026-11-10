@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { getGateState, getRelicHint } from './evaluation';
 import { evaluateExam } from './examEval';
 import { STANDARD_ANSWERS } from '../data/questionsData';
+import { getStudentQuestions } from '../data/questionsClient';
+import { hasRecordedCompleteTier, isQuestionComplete, sanitizeExamDraft } from './examAnswers';
 import { StationProgress, S3State } from '../types';
 
 test('evaluateExam passes when all base answers are correct', () => {
@@ -10,14 +12,14 @@ test('evaluateExam passes when all base answers are correct', () => {
   assert.equal(result.baseScore, 16);
   assert.equal(result.baseTotal, 16);
   assert.equal(result.g1Score, 5);
-  assert.equal(result.g2Score, 3);
+  assert.equal(result.g2Score, 8);
   assert.equal(result.passed, true);
   assert.equal(result.challengeScore, 6);
   assert.equal(result.challengePassed, true);
 });
 
-test('evaluateExam passes with threshold >= 13 and G1>=3 and G2>=2', () => {
-  // Copy standard answers, fail 3 non-G questions (e.g. B04, B05, B06 which are D1/K2)
+test('evaluateExam passes with threshold >= 13 and both goals at least half', () => {
+  // Three questions about explicit flowchart steps contribute to G2.
   const answers = { ...STANDARD_ANSWERS };
   answers.B04 = 'wrong';
   answers.B05 = 'wrong';
@@ -26,7 +28,7 @@ test('evaluateExam passes with threshold >= 13 and G1>=3 and G2>=2', () => {
   const result = evaluateExam(answers);
   assert.equal(result.baseScore, 13);
   assert.equal(result.g1Score, 5);
-  assert.equal(result.g2Score, 3);
+  assert.equal(result.g2Score, 5);
   assert.equal(result.passed, true);
 });
 
@@ -41,6 +43,28 @@ test('evaluateExam fails if G1 < 3 even if base score is 13', () => {
   assert.equal(result.baseScore, 13);
   assert.equal(result.g1Score, 2); // 2 < 3
   assert.equal(result.passed, false);
+});
+
+test('exam draft restores matching rows and marks the question complete only after every row', () => {
+  const questions = getStudentQuestions();
+  const matching = questions.find(question => question.id === 'B16')!;
+  const [row, ...otherRows] = matching.rows!;
+  const partial = { [row.prompt]: row.choices[0] };
+  const restored = sanitizeExamDraft(questions, JSON.parse(JSON.stringify({
+    B16: { ...partial, [otherRows[0].prompt]: '过期选项', extra: '未知行' },
+    B04: (STANDARD_ANSWERS.B04 as { diamond: string }).diamond,
+  })));
+  assert.deepEqual(restored.B16, partial);
+  assert.deepEqual(restored.B04, STANDARD_ANSWERS.B04);
+  assert.equal(isQuestionComplete(matching, restored.B16), false);
+  assert.equal(isQuestionComplete(matching, STANDARD_ANSWERS.B16), true);
+});
+
+test('an archived complete paper may contain older option wording, while a partial matching paper cannot count as first', () => {
+  const base = getStudentQuestions().filter(question => question.tier === 'base');
+  const oldWording = { ...STANDARD_ANSWERS, B08: '旧版选项' };
+  assert.equal(hasRecordedCompleteTier(base, oldWording), true);
+  assert.equal(hasRecordedCompleteTier(base, { ...oldWording, B16: {} }), false);
 });
 
 test('getGateState locks S3 until S2 is fully completed', () => {

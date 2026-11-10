@@ -27,11 +27,23 @@ var _wire_from: String = ""       # "yes" | "no" | ""
 var _edge_hits: Dictionary = {}   # handle_id -> Rect2
 var _node_hits: Dictionary = {}   # node_id -> Rect2
 var _locked: bool = false
+var _running: bool = false
+var _case_results: Array = []
+var _attempt_history: Array = []
+var _support_used: bool = false
+var _sim_node: String = ""
+var _sim_light: String = "red"
+var _sim_person: String = "等待"
+var _sim_status: String = "准备测试"
+var _crossing_background: Texture2D
+var _kettle_temperature: int = 80
+var _kettle_heating: bool = false
+var _kettle_status: String = "准备模拟"
 
 var prompt_label: Label
 var feedback_label: Label
 var canvas: Control
-var pool: HBoxContainer
+var pool: Container
 var tools: HBoxContainer
 var undo_btn: Button
 var submit_btn: Button
@@ -46,10 +58,22 @@ func setup(p_config: Dictionary) -> void:
 	_pick_side = ""
 	_wire_from = ""
 	_locked = false
+	_running = false
+	_case_results.clear()
+	_attempt_history.clear()
+	_support_used = false
+	_sim_node = ""
+	_sim_light = "red"
+	_sim_person = "等待"
+	_sim_status = "准备测试"
+	_kettle_temperature = 80
+	_kettle_heating = false
+	_kettle_status = "准备模拟"
 	_mode = str(config.get("mode", "fill"))
 	if not is_inside_tree():
 		await ready
 	_ensure_ui()
+	submit_btn.text = str(config.get("submit_text", "锁定并回放"))
 	_rebuild_pool()
 	_refresh()
 	if canvas:
@@ -79,6 +103,7 @@ func unlock_edit() -> void:
 		submit_btn.text = str(config.get("submit_text", "锁定并回放"))
 
 func highlight_next() -> String:
+	_support_used = true
 	var miss := _next_missing()
 	if miss == "":
 		return str(config.get("relic_ready", "可以锁定了——检查菱形与「是／否」连线。"))
@@ -119,11 +144,12 @@ func _ensure_ui() -> void:
 	feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root_vb.add_child(feedback_label)
 	var pool_title := Label.new()
-	pool_title.text = "卡片池（单击填入空槽 · 未作答不单项高亮）"
+	pool_title.text = "选择卡片，或在图上操作"
 	root_vb.add_child(pool_title)
-	pool = HBoxContainer.new()
+	pool = HFlowContainer.new()
 	pool.name = "Pool"
-	pool.add_theme_constant_override("separation", 8)
+	pool.add_theme_constant_override("h_separation", 8)
+	pool.add_theme_constant_override("v_separation", 8)
 	root_vb.add_child(pool)
 	tools = HBoxContainer.new()
 	tools.name = "Tools"
@@ -155,17 +181,13 @@ func _rebuild_pool() -> void:
 	for c in pool.get_children():
 		c.queue_free()
 	if _mode == "pick_side":
-		for card in config.get("cards", []):
-			var b := Button.new()
-			b.text = str(card.get("text", ""))
-			b.custom_minimum_size = Vector2(160, 44)
-			b.pressed.connect(_on_intent_card.bind(str(card.get("id", ""))))
-			pool.add_child(b)
 		return
 	var used := {}
 	for sid in filled.keys():
 		used[filled[sid]] = true
 	for card in config.get("cards", []):
+		if card.has("slot") and str(card.get("slot")) != _next_card_slot():
+			continue
 		var cid := str(card.get("id", ""))
 		if str(card.get("kind", "shape")) == "hint":
 			continue
@@ -205,6 +227,8 @@ func _on_intent_card(card_id: String) -> void:
 	_after_change()
 
 func undo_step() -> void:
+	if _running:
+		return
 	if _locked:
 		_locked = false
 		if submit_btn:
@@ -219,7 +243,11 @@ func undo_step() -> void:
 		"fill":
 			filled.erase(str(h.get("slot", "")))
 		"wire":
-			wires.erase(str(h.get("wire", "")))
+			var previous := str(h.get("prev", ""))
+			if previous == "":
+				wires.erase(str(h.get("wire", "")))
+			else:
+				wires[str(h.get("wire", ""))] = previous
 		"pick":
 			_pick_side = str(h.get("prev", ""))
 			if str(h.get("prev", "")) != "loop":
@@ -228,6 +256,12 @@ func undo_step() -> void:
 	_after_change()
 
 func _after_change() -> void:
+	if bool(config.get("crossing_simulation", false)) or bool(config.get("kettle_simulation", false)):
+		_case_results.clear()
+		_sim_node = ""
+		_sim_status = "方案已修改，请重新运行两种情况"
+		_kettle_status = "选择已修改，请重新模拟"
+		submit_btn.text = "运行80℃" if bool(config.get("kettle_simulation", false)) else "运行第一种情况"
 	_rebuild_pool()
 	_refresh()
 	board_changed.emit()
@@ -247,7 +281,7 @@ func _next_missing() -> String:
 	if _mode == "pick_side":
 		if _pick_side == "":
 			return "pick"
-		if bool(config.get("need_back_highlight", false)) and not wires.has("yes"):
+		if _pick_side == "loop" and bool(config.get("need_back_highlight", false)) and not wires.has("yes"):
 			return "wire:yes"
 		return ""
 	for sid in config.get("slot_order", []):
@@ -266,32 +300,15 @@ func _refresh() -> void:
 	var miss := _next_missing()
 	var tips: Dictionary = config.get("slot_tips", {})
 	if miss == "":
-		next_hint.text = "下一步：点「%s」" % str(config.get("submit_text", "锁定并回放"))
+		next_hint.text = "下一步：点「%s」" % submit_btn.text
 	else:
 		next_hint.text = "下一步：" + str(tips.get(miss, "按提示操作"))
 	next_hint.modulate = COLOR_SLOT_FOCUS
-	var preview := _evaluate()
 	if _mode == "pick_side":
-		if _pick_side == "loop":
-			feedback_label.text = "灯柱再闪一轮观察（循环）"
-			feedback_label.modulate = Color(0.5, 0.9, 0.55)
-		elif _pick_side == "branch":
-			feedback_label.text = "行人一次性走天桥或等灯，不再绕回（分支）"
-			feedback_label.modulate = Color(1.0, 0.55, 0.4)
-		else:
-			feedback_label.text = "点选哪张在问「还要不要再做」。"
-			feedback_label.modulate = Color.WHITE
-		return
-	if preview.get("complete", false):
-		if preview.get("struct_ok", false):
-			feedback_label.text = str(config.get("preview_ok", "结构看起来接上了——锁定后看回放。"))
-			feedback_label.modulate = Color(0.55, 0.9, 0.6)
-		else:
-			feedback_label.text = str(config.get("bad_feedback", "阿莲：看，有人挤出斑马线了！"))
-			feedback_label.modulate = Color(1.0, 0.4, 0.4)
+		feedback_label.text = "选择一张图，观察箭头如何走。" if _pick_side == "" else "已选择，检查后运行。"
 	else:
-		feedback_label.text = str(config.get("idle_feedback", "行人在路口等待布置…"))
-		feedback_label.modulate = Color.WHITE
+		feedback_label.text = str(config.get("idle_feedback", "完成选择后运行。"))
+	feedback_label.modulate = Color.WHITE
 
 func _evaluate() -> Dictionary:
 	var expect: Dictionary = config.get("expect", {})
@@ -303,7 +320,11 @@ func _evaluate() -> Dictionary:
 		return {"ok": ok, "complete": complete, "side": _pick_side, "highlightedBackEdge": wires.has("yes")}
 	var struct_ok := true
 	for sid in expect.get("slots", {}).keys():
-		if filled.get(str(sid), "") != str(expect["slots"][sid]):
+		var expected = expect["slots"][sid]
+		if expected is Array:
+			if not expected.has(filled.get(str(sid), "")):
+				struct_ok = false
+		elif filled.get(str(sid), "") != str(expected):
 			struct_ok = false
 	for wid in expect.get("wires", {}).keys():
 		if wires.get(str(wid), "") != str(expect["wires"][wid]):
@@ -321,11 +342,19 @@ func _evaluate() -> Dictionary:
 	}
 
 func _on_submit() -> void:
+	if _running:
+		return
 	var result := _evaluate()
 	if not result.get("complete", false):
 		feedback_label.text = "还有空缺：菱形条件或「是／否」连线未完成。"
 		feedback_label.modulate = Color(1.0, 0.7, 0.3)
 		tip_changed.emit(feedback_label.text)
+		return
+	if bool(config.get("crossing_simulation", false)):
+		_run_crossing_case(result)
+		return
+	if bool(config.get("kettle_simulation", false)):
+		_run_kettle_case(result)
 		return
 	_locked = true
 	if not result.get("ok", false):
@@ -340,7 +369,7 @@ func _on_submit() -> void:
 	submitted.emit(true, result)
 
 func _on_canvas_input(event: InputEvent) -> void:
-	if _locked:
+	if _locked or _running:
 		return
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
@@ -366,7 +395,7 @@ func _on_canvas_input(event: InputEvent) -> void:
 		if hr.has_point(local):
 			_wire_from = str(hid)
 			if next_hint:
-				next_hint.text = "下一步：再点要接到的那一步（%s）" % ("观察框" if hid == "yes" else "过马路")
+				next_hint.text = "下一步：点要接到的步骤"
 			if canvas:
 				canvas.queue_redraw()
 			return
@@ -375,17 +404,17 @@ func _handle_side_pick(local: Vector2) -> void:
 	var left: Rect2 = config.get("left_hit", Rect2(40, 40, 300, 280))
 	var right: Rect2 = config.get("right_hit", Rect2(370, 40, 300, 280))
 	var prev := _pick_side
+	var back_hit: Rect2 = config.get("back_hit", Rect2())
+	if _pick_side == "loop" and back_hit.has_area() and back_hit.has_point(local):
+		_history.push_back({"op": "wire", "wire": "yes", "prev": wires.get("yes", "")})
+		wires["yes"] = str(config.get("back_target", "observe"))
+		_after_change()
+		return
 	if left.has_point(local):
 		_pick_side = "loop"
 	elif right.has_point(local):
 		_pick_side = "branch"
 	else:
-		# 点回边高亮区
-		var back_hit: Rect2 = config.get("back_hit", Rect2())
-		if back_hit.has_area() and back_hit.has_point(local) and _pick_side == "loop":
-			_history.push_back({"op": "wire", "wire": "yes", "prev": wires.get("yes", "")})
-			wires["yes"] = str(config.get("back_target", "observe"))
-			_after_change()
 		return
 	_history.push_back({"op": "pick", "prev": prev})
 	_after_change()
@@ -403,7 +432,14 @@ func _draw_canvas() -> void:
 	for node in config.get("nodes", []):
 		_draw_node(node)
 	_draw_wires()
-	_draw_handles()
+	if not bool(config.get("hide_handles", false)):
+		_draw_handles()
+	if bool(config.get("crossing_simulation", false)):
+		_draw_crossing()
+	if bool(config.get("kettle_diagram", false)):
+		_draw_kettle_edges()
+	if bool(config.get("kettle_simulation", false)):
+		_draw_kettle_simulation()
 
 func _node_rect(node: Dictionary) -> Rect2:
 	return Rect2(node.get("pos", Vector2.ZERO), node.get("size", Vector2(200, 48)))
@@ -429,7 +465,7 @@ func _draw_node(node: Dictionary) -> void:
 			col = COLOR_DECISION if (not is_slot or filled.has(nid)) else COLOR_SLOT_EMPTY
 		_:
 			col = COLOR_PROCESS
-	var focus := is_slot and not filled.has(nid) and miss == nid
+	var focus := (is_slot and not filled.has(nid) and miss == nid) or (nid == _sim_node and _running)
 	match kind:
 		NodeKind.DECISION:
 			_draw_diamond(r, col, text, focus)
@@ -567,17 +603,17 @@ func _draw_side_by_side() -> void:
 	var right := Rect2(370, 20, 300, 280)
 	config["left_hit"] = left
 	config["right_hit"] = right
-	config["back_hit"] = Rect2(40, 100, 40, 100)
-	canvas.draw_rect(left, Color(0.12, 0.18, 0.28, 0.9), true)
-	canvas.draw_rect(right, Color(0.12, 0.18, 0.28, 0.9), true)
+	config["back_hit"] = Rect2(70, 100, 40, 100)
+	canvas.draw_rect(left, Color("e5f2f8"), true)
+	canvas.draw_rect(right, Color("e5f2f8"), true)
 	if _pick_side == "loop":
 		canvas.draw_rect(left.grow(2), COLOR_SLOT_FOCUS, false, 3.0)
 	elif _pick_side == "branch":
 		canvas.draw_rect(right.grow(2), COLOR_SLOT_FOCUS, false, 3.0)
 	_draw_mini_loop(Vector2(80, 50), wires.has("yes"))
 	_draw_mini_branch(Vector2(420, 50))
-	_draw_label_at(Vector2(100, 270), "循环（有回边）", Color(0.9, 0.95, 1))
-	_draw_label_at(Vector2(455, 270), "分支（双出口）", Color(0.9, 0.95, 1))
+	_draw_label_at(Vector2(145, 270), "方案甲", Color("173a54"))
+	_draw_label_at(Vector2(485, 270), "方案乙", Color("173a54"))
 
 func _draw_mini_loop(origin: Vector2, back_on: bool) -> void:
 	var start := Rect2(origin + Vector2(40, 0), Vector2(120, 28))
@@ -588,12 +624,14 @@ func _draw_mini_loop(origin: Vector2, back_on: bool) -> void:
 	_draw_box(proc, COLOR_PROCESS, "观察灯色", false)
 	canvas.draw_line(proc.position + Vector2(60, 28), dec.position + Vector2(70, 0), COLOR_ARROW, 2)
 	_draw_diamond(dec, COLOR_DECISION, "绿灯未亮起？", false)
-	var col := COLOR_YES_EDGE if back_on else Color(0.55, 0.55, 0.6, 0.7)
+	var col := COLOR_YES_EDGE if back_on else COLOR_ARROW
 	canvas.draw_line(dec.position + Vector2(0, 28), Vector2(origin.x + 10, origin.y + 128), col, 2.5)
 	canvas.draw_line(Vector2(origin.x + 10, origin.y + 128), Vector2(origin.x + 10, origin.y + 64), col, 2.5)
 	canvas.draw_line(Vector2(origin.x + 10, origin.y + 64), proc.position + Vector2(0, 14), col, 2.5)
 	_draw_label_at(Vector2(origin.x + 12, origin.y + 90), "是", col)
 	canvas.draw_line(dec.position + Vector2(140, 28), Vector2(origin.x + 200, origin.y + 128), COLOR_ARROW, 2)
+	canvas.draw_line(Vector2(origin.x + 200, origin.y + 128), Vector2(origin.x + 200, origin.y + 160), COLOR_ARROW, 2)
+	_draw_arrow_head(Vector2(origin.x + 200, origin.y + 160), Vector2.DOWN, COLOR_ARROW)
 	_draw_label_at(Vector2(origin.x + 175, origin.y + 110), "否", COLOR_ARROW)
 	_draw_stadium(Rect2(origin + Vector2(150, 160), Vector2(100, 28)), COLOR_START, "通行", false)
 
@@ -609,3 +647,219 @@ func _draw_mini_branch(origin: Vector2) -> void:
 	canvas.draw_line(dec.position + Vector2(140, 28), right.position + Vector2(50, 0), COLOR_ARROW, 2)
 	_draw_box(left, COLOR_PROCESS, "走天桥", false)
 	_draw_box(right, COLOR_PROCESS, "原地等灯", false)
+
+# 两种信号情形均执行学生当前的条件与连线，最多走十二步。
+func _run_crossing_case(result: Dictionary) -> void:
+	_running = true
+	undo_btn.disabled = true
+	back_btn.disabled = true
+	submit_btn.disabled = true
+	var case_id := "green_at_start" if _case_results.is_empty() else "red_then_green"
+	var trace: Array = []
+	var current := "observe"
+	var observations := 0
+	var outcome := "step_limit"
+	_sim_person = "等待"
+	_sim_status = "开始时绿灯亮" if case_id == "green_at_start" else "先红灯，再变绿灯"
+	for step in range(12):
+		_sim_node = current
+		# 模拟信号按时间步切换，不由观察次数触发。
+		_sim_light = "green" if case_id == "green_at_start" or step >= 4 else "red"
+		if current == "observe":
+			observations += 1
+			_sim_status = "第 %d 次观察：%s灯" % [observations, "绿" if _sim_light == "green" else "红"]
+			trace.append({"node": "observe", "light": _sim_light})
+			current = "decide"
+		elif current == "decide":
+			var condition := str(filled.get("decide", ""))
+			var answer := false
+			match condition:
+				"cond_green_off": answer = _sim_light != "green"
+				"cond_bridge": answer = false # 这一情形没有可用天桥
+				"cond_count": answer = observations >= 3
+				"cond_arrive": answer = false # 还在路口
+				_:
+					outcome = "not_a_condition"
+					_sim_status = "这张卡不是可以回答是或否的问题"
+			if outcome == "not_a_condition":
+				trace.append({"node": "decide", "error": outcome})
+				canvas.queue_redraw()
+				await get_tree().create_timer(0.42).timeout
+				break
+			var branch := "yes" if answer else "no"
+			current = str(wires.get(branch, ""))
+			_sim_status = "判断结果：%s" % ("是" if answer else "否")
+			trace.append({"node": "decide", "light": _sim_light, "answer": branch, "to": current})
+		elif current == "cross":
+			if _sim_light == "green":
+				outcome = "crossed_green"
+				_sim_person = "通过"
+				_sim_status = "绿灯亮，行人安全通过"
+			else:
+				outcome = "red_blocked"
+				_sim_person = "路沿停下"
+				_sim_status = "红灯还亮着，行人在路沿停下"
+			trace.append({"node": "cross", "light": _sim_light, "outcome": outcome})
+			canvas.queue_redraw()
+			await get_tree().create_timer(0.42).timeout
+			break
+		else:
+			outcome = "wrong_destination"
+			_sim_status = "流程没有走到观察或过马路"
+			trace.append({"node": current, "outcome": outcome})
+			canvas.queue_redraw()
+			await get_tree().create_timer(0.42).timeout
+			break
+		canvas.queue_redraw()
+		await get_tree().create_timer(0.42).timeout
+	if outcome == "step_limit":
+		_sim_status = "走了多步还没通过，看看箭头"
+	var case_result := {"caseId": case_id, "outcome": outcome, "observations": observations, "trace": trace}
+	_case_results.append(case_result)
+	ClassroomBridge.report_evidence({
+		"eventType": "case_run", "eventId": "s2_rewrite-run-%s-%s" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()],
+		"taskId": GameState.TASK_S2A, "correct": outcome == "crossed_green",
+		"payload": {"conditionCardId": filled.get("decide", ""), "wires": wires.duplicate(), "case": case_result, "supportUsed": _support_used or int(GameState.fail_counts.get(GameState.TASK_S2A, 0)) > 0}
+	})
+	_running = false
+	undo_btn.disabled = false
+	back_btn.disabled = false
+	submit_btn.disabled = false
+	canvas.queue_redraw()
+	if _case_results.size() < 2:
+		submit_btn.text = "运行第二种情况"
+		next_hint.text = "下一步：点「运行第二种情况」"
+		feedback_label.text = _sim_status + "。再试另一种情况。"
+		return
+	var complete_ok := bool(result.get("ok", false))
+	for item in _case_results:
+		complete_ok = complete_ok and item.get("outcome") == "crossed_green"
+	var attempt := {"filled": filled.duplicate(), "wires": wires.duplicate(), "caseResults": _case_results.duplicate(true), "correct": complete_ok}
+	_attempt_history.append(attempt)
+	result["caseResults"] = _case_results.duplicate(true)
+	result["attemptHistory"] = _attempt_history.duplicate(true)
+	result["supportUsed"] = _support_used or int(GameState.fail_counts.get(GameState.TASK_S2A, 0)) > 0
+	result["lightReplay"] = "two_cases"
+	if complete_ok:
+		_locked = true
+		feedback_label.text = "两种情况都试过了，行人安全通过。"
+		submitted.emit(true, result)
+	else:
+		feedback_label.text = "两种情况已运行。看看结果，撤回后修改。"
+		submitted.emit(false, result)
+
+func _draw_crossing() -> void:
+	var left := 30.0
+	var road := Rect2(left, 20, 330, 220)
+	var background_path := "res://assets/sprites/scenes/crossing_redesign.png"
+	if _crossing_background == null and ResourceLoader.exists(background_path):
+		_crossing_background = load(background_path) as Texture2D
+	if _crossing_background != null:
+		canvas.draw_texture_rect(_crossing_background, road, false)
+	else:
+		canvas.draw_rect(road, Color("d9eef0"))
+		canvas.draw_rect(Rect2(left + 130, 20, 70, 220), Color("597581"))
+		for i in range(5):
+			canvas.draw_rect(Rect2(left + 130, 150 + i * 12, 70, 6), Color("f8fafc"))
+	canvas.draw_rect(Rect2(left + 70, 115, 25, 54), Color("263b48"))
+	canvas.draw_circle(Vector2(left + 82, 129), 8, Color("ef4444") if _sim_light == "red" else Color("683a3a"))
+	canvas.draw_circle(Vector2(left + 82, 155), 8, Color("35c777") if _sim_light == "green" else Color("315a45"))
+	var person_x := 110.0 if _sim_person != "通过" else 217.0
+	canvas.draw_circle(Vector2(left + person_x, 169), 9, Color("f1b782"))
+	canvas.draw_rect(Rect2(left + person_x - 9, 178, 18, 21), Color("f59e0b"))
+	_draw_label_at(Vector2(left + 8, 260), _sim_status, Color("173a54"))
+
+func _draw_kettle_edges() -> void:
+	# “是”进入加热并回到读取；“否”向下结束。
+	canvas.draw_line(Vector2(220, 128), Vector2(175, 128), COLOR_ARROW, 2.5)
+	_draw_arrow_head(Vector2(175, 128), Vector2.LEFT, COLOR_ARROW)
+	var points := PackedVector2Array([Vector2(100, 110), Vector2(100, 63), Vector2(245, 63)])
+	canvas.draw_polyline(points, COLOR_ARROW, 2.5, true)
+	_draw_arrow_head(Vector2(245, 63), Vector2.RIGHT, COLOR_ARROW)
+	_draw_label_at(Vector2(180, 120), "是", Color("173a54"))
+	_draw_label_at(Vector2(340, 186), "否", Color("173a54"))
+
+# 热水壶采用固定教材流程；学生认读图并观察两种起始水温。
+func _run_kettle_case(result: Dictionary) -> void:
+	_running = true
+	undo_btn.disabled = true
+	back_btn.disabled = true
+	submit_btn.disabled = true
+	var initial := 80 if _case_results.is_empty() else 100
+	var water := initial
+	var trace: Array = []
+	_kettle_temperature = water
+	_kettle_heating = false
+	for round_index in range(3):
+		_sim_node = "check"
+		_kettle_status = "读取水温：%d℃" % water
+		trace.append({"node": "check", "temperature": water})
+		canvas.queue_redraw()
+		await get_tree().create_timer(0.42).timeout
+		_sim_node = "decide"
+		var needs_heat := water < 100
+		_kettle_status = "低于100℃？%s" % ("是" if needs_heat else "否")
+		trace.append({"node": "decide", "temperature": water, "answer": needs_heat})
+		canvas.queue_redraw()
+		await get_tree().create_timer(0.42).timeout
+		if not needs_heat:
+			_sim_node = "stop"
+			_kettle_heating = false
+			_kettle_status = "已达到100℃，停止加热"
+			trace.append({"node": "stop", "temperature": water})
+			canvas.queue_redraw()
+			await get_tree().create_timer(0.42).timeout
+			break
+		_sim_node = "heat"
+		_kettle_heating = true
+		_kettle_status = "继续加热（模拟）"
+		trace.append({"node": "heat", "temperature": water})
+		canvas.queue_redraw()
+		await get_tree().create_timer(0.42).timeout
+		water = mini(100, water + 10)
+		_kettle_temperature = water
+		_kettle_heating = false
+	var case_result := {"initialTemperature": initial, "finalTemperature": water, "trace": trace}
+	_case_results.append(case_result)
+	ClassroomBridge.report_evidence({
+		"eventType": "case_run", "eventId": "s2_kettle-run-%s-%s" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()],
+		"taskId": GameState.TASK_S2C, "correct": bool(result.get("ok", false)),
+		"payload": {"filled": filled.duplicate(), "case": case_result, "supportUsed": _support_used or int(GameState.fail_counts.get(GameState.TASK_S2C, 0)) > 0}
+	})
+	_running = false
+	undo_btn.disabled = false
+	back_btn.disabled = false
+	submit_btn.disabled = false
+	canvas.queue_redraw()
+	if _case_results.size() < 2:
+		submit_btn.text = "运行100℃"
+		next_hint.text = "下一步：点「运行100℃」"
+		feedback_label.text = "80℃的情况已模拟，再试100℃。"
+		return
+	var complete_ok := bool(result.get("ok", false))
+	_attempt_history.append({"filled": filled.duplicate(), "caseResults": _case_results.duplicate(true), "correct": complete_ok})
+	result["caseResults"] = _case_results.duplicate(true)
+	result["attemptHistory"] = _attempt_history.duplicate(true)
+	result["supportUsed"] = _support_used or int(GameState.fail_counts.get(GameState.TASK_S2C, 0)) > 0
+	if complete_ok:
+		_locked = true
+		feedback_label.text = "两种水温都已模拟。"
+		submitted.emit(true, result)
+	else:
+		feedback_label.text = "两种水温已模拟，再对照流程修改。"
+		submitted.emit(false, result)
+
+func _draw_kettle_simulation() -> void:
+	var panel := Rect2(785, 20, 225, 245)
+	canvas.draw_rect(panel, Color("e5f2f8"), true)
+	canvas.draw_rect(Rect2(845, 72, 100, 120), Color("d3e6ec"), true)
+	canvas.draw_rect(Rect2(852, 145, 86, 40), Color("7ec4e1"), true)
+	canvas.draw_rect(Rect2(837, 63, 116, 10), Color("456775"), true)
+	canvas.draw_arc(Vector2(945, 124), 30, -PI/2, PI/2, 16, Color("456775"), 5)
+	if _kettle_heating:
+		canvas.draw_circle(Vector2(873, 205), 6, Color("f97316"))
+		canvas.draw_circle(Vector2(895, 205), 7, Color("f97316"))
+		canvas.draw_circle(Vector2(917, 205), 6, Color("f97316"))
+	_draw_label_at(Vector2(859, 125), "%d℃" % _kettle_temperature, Color("173a54"))
+	_draw_label_at(Vector2(800, 239), _kettle_status, Color("173a54"))
+	_draw_label_at(Vector2(800, 41), "水温模拟", Color("173a54"))

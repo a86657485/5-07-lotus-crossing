@@ -1,470 +1,438 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { ClassId, StudentSessionRecord } from '../../types';
-import { CLASS_ROSTERS, TOTAL_STUDENTS_COUNT } from '../../data/roster';
-import { apiTeacher, teacherExportUrl, TeacherPayload } from '../../api/client';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ExamEvaluationResult, LearningEvidence } from '../../types';
+import { apiSetClassExamPaused, apiTeacher, teacherExportUrl, type TeacherPayload } from '../../api/client';
+import { RewardLeaderboard } from './RewardLeaderboard';
+import { TeacherOverview, type OverviewPupil } from './TeacherOverview';
+import './teacherDashboard.css';
 
-/** 固定名单分母下，1 人完成会被 Math.round 成 0%；完成人数>0 时至少显示 <1% 并带人数。 */
-function formatStationRate(count: number, total: number): { pctLabel: string; countLabel: string } {
-  if (total <= 0) return { pctLabel: '0%', countLabel: '0/0 人' };
-  const raw = (count / total) * 100;
-  let pctLabel: string;
-  if (count <= 0) pctLabel = '0%';
-  else if (raw < 1) pctLabel = '<1%';
-  else pctLabel = `${Math.round(raw)}%`;
-  return { pctLabel, countLabel: `${count}/${total} 人` };
+type Pupil = TeacherPayload['students'][number];
+type SortField = 'classId' | 'name' | 'lastSync' | 'first' | 'latest' | 'support';
+type SortKey = { field: SortField; ascending: boolean };
+type ScoreRange = { min: string; max: string };
+
+const classIds = ['501', '502', '503', '504'];
+const control = 'g5-teacher-control';
+const button = 'g5-teacher-button';
+const defaultSorting: SortKey[] = [{ field: 'classId', ascending: true }];
+const sortLabels: Record<SortField, string> = {
+  classId: '班级', name: '姓名', first: '基础首答', latest: '基础最近', support: '法宝', lastSync: '最近同步',
+};
+const taskNames: Record<string, string> = {
+  s1_order: '第一站 过街顺序',
+  s2_rewrite: '第一站 过街流程图',
+  s2_vs_branch: '第二站 比较分支与循环',
+  s2_kettle: '第二站 热水壶',
+  s3_timing: '第三站 调度',
+};
+const eventNames: Record<string, string> = {
+  attempt: '尝试',
+  evidence_attempt: '尝试',
+  case_run: '情形运行',
+  scenario_run: '模拟运行',
+  simulation_run: '模拟运行',
+  evidence_lock: '完成确认',
+  station_reset: '重做',
+  current_invalidated: '修改方案',
+};
+const attemptNames: Record<string, string> = {
+  first: '首答', revision: '修订', process: '过程', confirmation: '确认', unknown: '次数不明',
+};
+const misconceptions: Record<string, string> = {
+  M1: '混淆循环和分支',
+  M2: '认为必须先确定重复次数',
+  M3: '混淆条件与动作',
+  M4: '未找准反复步骤',
+  M5: '混淆判断与执行的先后',
+  M6: '混淆顺序、分支与循环',
+};
+
+const firstResult = (row: Pupil) => row.examFirstComplete ? row.examFirstResult || row.examResult : null;
+const recentResult = (row: Pupil) => row.examLatestComplete ? row.examLatestResult || firstResult(row) : firstResult(row);
+const secondStationDone = (row: Pupil) => row.stations.s2_rewrite && row.stations.s2_vs_branch && row.stations.s2_kettle;
+const stationFlags = (row: Pupil) => [row.stations.s1_order, secondStationDone(row), row.stations.s3_timing] as const;
+
+function overviewPupil(row: Pupil): OverviewPupil {
+  const first = firstResult(row);
+  return {
+    entered: row.entered,
+    stationFlags: stationFlags(row),
+    firstScore: first?.baseScore ?? null,
+    latestScore: recentResult(row)?.baseScore ?? null,
+    firstPassed: !!first?.passed,
+    challengePassed: row.challengeFirstComplete && !!(row.challengeFirstResult || row.examResult)?.challengePassed,
+  };
 }
 
-interface TeacherDashboardViewProps {
-  onBackToApp?: () => void;
+function getEvidence(row: Pupil) {
+  const entries = new Map<string, LearningEvidence>();
+  for (const item of [...(row.evidenceHistory || []), ...(row.evidence || [])]) {
+    if (taskNames[item.taskId]) entries.set(item.eventId, item);
+  }
+  return [...entries.values()].sort((a, b) => (b.receivedAt || '').localeCompare(a.receivedAt || ''));
 }
 
-export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
-  onBackToApp,
-}) => {
-  const [selectedClass, setSelectedClass] = useState<string>('all');
+function hasConceptSupport(row: Pupil, evidence: LearningEvidence[]) {
+  return row.relics.used > 0 || evidence.some(item =>
+    item.payload?.supportUsed === true || item.payload?.kind === 'concept_support' || item.payload?.kind === 'error_scaffold'
+  );
+}
+
+function scoreLabel(result: ExamEvaluationResult | null | undefined) {
+  return result ? `${result.baseScore} / ${result.baseTotal}` : '尚无考核记录';
+}
+
+function goalLabel(result: ExamEvaluationResult | null | undefined) {
+  if (!result) return '尚无考核记录';
+  return `G1 ${result.g1Score}/${result.g1Total} · G2 ${result.g2Score}/${result.g2Total}`;
+}
+
+function inRange(score: number | undefined, range: ScoreRange) {
+  if (!range.min && !range.max) return true;
+  if (score === undefined) return false;
+  return (!range.min || score >= Number(range.min)) && (!range.max || score <= Number(range.max));
+}
+
+function sortValue(row: Pupil, field: SortField): string | number {
+  switch (field) {
+    case 'classId': return row.student.classId;
+    case 'name': return row.student.name;
+    case 'lastSync': return row.lastSync || '';
+    case 'first': return firstResult(row)?.baseScore ?? 0;
+    case 'latest': return recentResult(row)?.baseScore ?? 0;
+    case 'support': return row.relics.used;
+  }
+}
+
+function compareRows(a: Pupil, b: Pupil, sorting: SortKey[]) {
+  if (!!firstResult(a) !== !!firstResult(b)) return firstResult(a) ? -1 : 1;
+  for (const key of sorting) {
+    const left = sortValue(a, key.field), right = sortValue(b, key.field);
+    const order = typeof left === 'string' && typeof right === 'string'
+      ? left.localeCompare(right, 'zh-CN')
+      : Number(left) - Number(right);
+    if (order) return key.ascending ? order : -order;
+  }
+  return a.student.studentId.localeCompare(b.student.studentId);
+}
+
+function formatTime(value: string | null | undefined) {
+  if (!value) return '尚无记录';
+  return new Date(value).toLocaleString('zh-CN', { hour12: false });
+}
+
+function PupilEvidence({ row, evidence }: { row: Pupil; evidence: LearningEvidence[] }) {
+  const latest = recentResult(row);
+  const problems = latest?.details.filter(item => !item.correct) || [];
+  const required = evidence.filter(item => item.payload?.optional !== true && item.payload?.scenario !== 'maze_transfer');
+  const optional = evidence.filter(item => item.payload?.optional === true || item.payload?.scenario === 'maze_transfer');
+  const passed = stationFlags(row);
+  const stations = [
+    { name: '行人过街引导台', tasks: ['s1_order', 's2_rewrite'] },
+    { name: '信号循环拆解台', tasks: ['s2_vs_branch', 's2_kettle'] },
+    { name: '路口信号调度台', tasks: ['s3_timing'] },
+  ];
+  return <div className="g5-teacher-evidence">
+    <div className="g5-teacher-evidence-grid">
+      {stations.map(({ name, tasks }, index) => {
+        const count = required.filter(item => tasks.includes(item.taskId)).length;
+        return <section className="g5-teacher-evidence-card" key={name}>
+          <h3>{name}</h3>
+          <p><span className="g5-teacher-badge" data-tone={passed[index] ? 'ok' : 'neutral'}>{passed[index] ? '当前通过' : '尚未通过'}</span></p>
+          <p>{count ? `${count} 条探究记录` : '尚无证据'}</p>
+        </section>;
+      })}
+    </div>
+    <div className="g5-teacher-evidence-grid">
+    <section>
+      <h3 className="font-semibold mb-1">成绩与目标</h3>
+      <p>首答 {scoreLabel(firstResult(row))} · {goalLabel(firstResult(row))}</p>
+      <p>最近 {scoreLabel(latest)} · {goalLabel(latest)}</p>
+      {row.incompleteScores?.base !== undefined && <p>旧不完整基础卷 {row.incompleteScores.base} 分 · 历史记录</p>}
+      {row.incompleteScores?.challenge !== undefined && <p>旧不完整挑战卷 {row.incompleteScores.challenge} 分 · 历史记录</p>}
+      <p>最近同步 {formatTime(row.lastSync)}</p>
+      <p>法宝 {row.relics.used} / 3 次</p>
+      <p>{row.examOpen ? '已取得开考资格' : '尚未开考'}</p>
+    </section>
+    <section>
+      <h3 className="font-semibold mb-1">最近的必做探究证据</h3>
+      {required.length ? <ul className="space-y-1">{required.slice(0, 5).map(item =>
+        <li key={item.eventId}>
+          {taskNames[item.taskId]} · {eventNames[item.eventType] || '操作记录'} · {attemptNames[item.attemptKind || 'unknown']}
+          {item.payload?.supportUsed === true ? ' · 获得支持' : ''}
+          {item.correct == null ? '' : item.correct ? ' · 符合预期' : ' · 待修正'}
+          <span className="block g5-teacher-muted">{formatTime(item.receivedAt)}</span>
+        </li>
+      )}</ul> : <p>尚无证据</p>}
+      <p className="mt-2">选做巡检记录 {optional.length || '尚无证据'}</p>
+    </section>
+    <section>
+      <h3 className="font-semibold mb-1">最近考核待巩固</h3>
+      {problems.length ? <ul className="space-y-1">{problems.map(item => <li key={item.questionId}>
+        {item.questionId} · {(item.misconceptionIds || (item.misconceptionId ? [item.misconceptionId] : []))
+          .map(id => misconceptions[id] || id).join('、') || '未分类'}
+      </li>)}</ul> : <p>{latest?.details.length ? '本次没有错题' : '尚无逐题证据'}</p>}
+    </section>
+    </div>
+  </div>;
+}
+
+export const TeacherDashboardView: React.FC<{ onBackToApp?: () => void }> = ({ onBackToApp }) => {
+  const [selectedClass, setSelectedClass] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [passFilter, setPassFilter] = useState<'all' | 'passed' | 'failed' | 'no_record'>('all');
-  const [sortField, setSortField] = useState<string>('classId');
-  const [sortAsc, setSortAsc] = useState<boolean>(true);
+  const [passFilter, setPassFilter] = useState('all');
+  const [targetFilter, setTargetFilter] = useState('all');
+  const [evidenceFilter, setEvidenceFilter] = useState('all');
+  const [supportFilter, setSupportFilter] = useState('all');
+  const [firstRange, setFirstRange] = useState<ScoreRange>({ min: '', max: '' });
+  const [latestRange, setLatestRange] = useState<ScoreRange>({ min: '', max: '' });
+  const [sorting, setSorting] = useState<SortKey[]>(defaultSorting);
+  const [addSort, setAddSort] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [payload, setPayload] = useState<TeacherPayload | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [operationMessage, setOperationMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const latestRequest = useRef(0);
 
   const refresh = useCallback(async () => {
+    const id = ++latestRequest.current;
     setLoading(true);
     try {
-      const data = await apiTeacher(selectedClass === 'all' ? undefined : selectedClass);
-      setPayload(data);
+      // Fetch the grade once per refresh so class changes and detail filters stay local.
+      const result = await apiTeacher();
+      if (id !== latestRequest.current) return;
+      setPayload(result);
       setLoadError('');
-    } catch (err: any) {
-      setLoadError(err?.message || '教师数据加载失败');
+    } catch (error) {
+      if (id !== latestRequest.current) return;
+      setLoadError(error instanceof Error ? error.message : '教师数据加载失败');
     } finally {
-      setLoading(false);
+      if (id === latestRequest.current) setLoading(false);
     }
-  }, [selectedClass]);
+  }, []);
 
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => void refresh(), 8000);
-    return () => window.clearInterval(timer);
+    return () => { window.clearInterval(timer); latestRequest.current++; };
   }, [refresh]);
 
-  const sessions = useMemo(() => {
-    const map: Record<string, StudentSessionRecord> = {};
-    for (const row of payload?.students || []) {
-      map[row.student.studentId] = {
-        student: row.student,
-        startedAt: row.lastSync || '',
-        lastActiveAt: row.lastSync || '',
-        stations: row.stations,
-        s3Detail: row.s3Detail,
-        relics: row.relics,
-        scaffoldHistory: [],
-        examResult: row.examResult || undefined,
-        rewardUnlocked: row.rewardUnlocked,
-      };
+  const hasPayload = payload !== null;
+  useEffect(() => {
+    if (hasPayload && window.location.hash === '#reward-leaderboard-title') {
+      document.getElementById('reward-leaderboard-title')?.scrollIntoView({ block: 'start' });
     }
-    return map;
-  }, [payload]);
+  }, [hasPayload]);
 
-  const rosterStudents = useMemo(() => {
-    if (selectedClass === 'all') {
-      return [
-        ...CLASS_ROSTERS['501'],
-        ...CLASS_ROSTERS['502'],
-        ...CLASS_ROSTERS['503'],
-        ...CLASS_ROSTERS['504'],
-      ];
-    }
-    return CLASS_ROSTERS[selectedClass as ClassId] || [];
-  }, [selectedClass]);
+  const evidenceByPupil = useMemo(() =>
+    new Map((payload?.students || []).map(row => [row.student.studentId, getEvidence(row)])), [payload]);
 
-  const mergedStudentRows = useMemo(() => {
-    // Prefer server rows (includes manual); fall back to full roster denominator list
-    const byId = new Map(rosterStudents.map(s => [s.studentId, s]));
-    for (const row of payload?.students || []) {
-      byId.set(row.student.studentId, row.student);
-    }
-    return Array.from(byId.values()).map(student => {
-      const session = sessions[student.studentId];
-      return {
-        student,
-        session,
-        isLoggedIn: !!session,
-        s1Ok: session?.stations.s1_order ?? false,
-        s2Ok: (session?.stations.s2_rewrite && session?.stations.s2_vs_branch && session?.stations.s2_kettle) ?? false,
-        s3Ok: session?.stations.s3_timing ?? false,
-        examScore: session?.examResult?.baseScore,
-        passed: session?.examResult?.passed ?? false,
-        g1Score: session?.examResult?.g1Score,
-        g2Score: session?.examResult?.g2Score,
-        challengeScore: session?.examResult?.challengeScore,
-        challengeBonus: session?.examResult?.challengePassed ?? false,
-        relicUsed: session?.relics.used ?? 0,
-        relicRemaining: session?.relics.remaining ?? 3,
-      };
-    });
-  }, [sessions, rosterStudents, payload]);
-
-  const totalRosterCount = payload?.denominator
-    ?? (selectedClass === 'all'
-      ? TOTAL_STUDENTS_COUNT
-      : CLASS_ROSTERS[selectedClass as ClassId]?.length || TOTAL_STUDENTS_COUNT);
-
-  const filteredRows = useMemo(() => {
-    return mergedStudentRows.filter(row => {
+  const rows = useMemo(() => {
+    const query = searchQuery.trim();
+    return (payload?.students || []).filter(row => {
       if (selectedClass !== 'all' && row.student.classId !== selectedClass) return false;
-      if (searchQuery.trim() && !row.student.name.includes(searchQuery.trim())) return false;
-      if (passFilter === 'passed' && !row.passed) return false;
-      if (passFilter === 'failed' && (row.passed || row.examScore === undefined)) return false;
-      if (passFilter === 'no_record' && row.examScore !== undefined) return false;
-      return true;
-    });
-  }, [mergedStudentRows, selectedClass, searchQuery, passFilter]);
-
-  const sortedRows = useMemo(() => {
-    return [...filteredRows].sort((a, b) => {
-      let valA: any = a[sortField as keyof typeof a];
-      let valB: any = b[sortField as keyof typeof b];
-      if (sortField === 'classId') {
-        valA = a.student.classId;
-        valB = b.student.classId;
-      } else if (sortField === 'name') {
-        valA = a.student.name;
-        valB = b.student.name;
+      if (query && !row.student.name.includes(query)) return false;
+      const first = firstResult(row);
+      if (passFilter === 'passed' && !first?.passed) return false;
+      if (passFilter === 'failed' && (!first || first.passed)) return false;
+      if (passFilter === 'no_record' && first) return false;
+      if (targetFilter !== 'all') {
+        const [goal, status] = targetFilter.split(':');
+        const score = goal === 'g1' ? first?.g1Score : first?.g2Score;
+        const total = goal === 'g1' ? first?.g1Total : first?.g2Total;
+        if (score === undefined || !total) return false;
+        if ((score >= Math.ceil(total / 2)) !== (status === 'met')) return false;
       }
-      if (valA === undefined) return 1;
-      if (valB === undefined) return -1;
-      if (valA < valB) return sortAsc ? -1 : 1;
-      if (valA > valB) return sortAsc ? 1 : -1;
-      return 0;
+      const evidence = evidenceByPupil.get(row.student.studentId) || [];
+      if (evidenceFilter === 'recorded' && !evidence.length) return false;
+      if (evidenceFilter === 'none' && evidence.length) return false;
+      if (evidenceFilter === 'revision' && !evidence.some(item => item.attemptKind === 'revision')) return false;
+      if (evidenceFilter === 'confirmed' && !evidence.some(item => item.eventType === 'evidence_lock' && item.correct === true)) return false;
+      if (supportFilter !== 'all' && hasConceptSupport(row, evidence) !== (supportFilter === 'used')) return false;
+      return inRange(first?.baseScore, firstRange) && inRange(recentResult(row)?.baseScore, latestRange);
+    }).sort((a, b) => compareRows(a, b, sorting));
+  }, [payload, evidenceByPupil, selectedClass, searchQuery, passFilter, targetFilter, evidenceFilter, supportFilter, firstRange, latestRange, sorting]);
+
+  function changeSort(field: SortField, append: boolean) {
+    setSorting(old => {
+      const previous = old.find(item => item.field === field);
+      const key = { field, ascending: previous ? !previous.ascending : true };
+      if (!append) return [key];
+      if (previous) return old.map(item => item.field === field ? key : item);
+      return [...old, key];
     });
-  }, [filteredRows, sortField, sortAsc]);
+  }
 
-  const stats = useMemo(() => {
-    const relevant = selectedClass === 'all'
-      ? mergedStudentRows
-      : mergedStudentRows.filter(r => r.student.classId === selectedClass);
-    // Prefer row-derived counts so KPI 与名单 ✓ 同源；summary 作交叉校验兜底
-    const s1FromRows = relevant.filter(r => r.s1Ok).length;
-    const s2FromRows = relevant.filter(r => r.s2Ok).length;
-    const s3FromRows = relevant.filter(r => r.s3Ok).length;
-    const examFromRows = relevant.filter(r => r.passed).length;
-    const loggedCount = payload?.summary.entered ?? relevant.filter(r => r.isLoggedIn).length;
-    const s1Count = Math.max(payload?.summary.s1 ?? 0, s1FromRows);
-    const s2Count = Math.max(payload?.summary.s2 ?? 0, s2FromRows);
-    const s3Count = Math.max(payload?.summary.s3 ?? 0, s3FromRows);
-    const examPassedCount = Math.max(payload?.summary.examPassed ?? 0, examFromRows);
-    const challengeBonusCount = payload?.summary.challengeBonus ?? relevant.filter(r => r.challengeBonus).length;
-    const totalRelicsUsed = payload?.summary.relicUsed ?? relevant.reduce((sum, r) => sum + r.relicUsed, 0);
-    const s1 = formatStationRate(s1Count, totalRosterCount);
-    const s2 = formatStationRate(s2Count, totalRosterCount);
-    const s3 = formatStationRate(s3Count, totalRosterCount);
-    const exam = formatStationRate(examPassedCount, totalRosterCount);
-    return {
-      loggedCount,
-      totalCount: totalRosterCount,
-      s1Count,
-      s2Count,
-      s3Count,
-      examPassedCount,
-      s1Pct: s1.pctLabel,
-      s2Pct: s2.pctLabel,
-      s3Pct: s3.pctLabel,
-      examPct: exam.pctLabel,
-      s1Detail: s1.countLabel,
-      s2Detail: s2.countLabel,
-      s3Detail: s3.countLabel,
-      examDetail: exam.countLabel,
-      challengeBonusCount,
-      avgRelicUse: loggedCount > 0 ? (totalRelicsUsed / loggedCount).toFixed(1) : '0.0',
-    };
-  }, [mergedStudentRows, selectedClass, totalRosterCount, payload]);
+  function sortHeader(field: SortField) {
+    const index = sorting.findIndex(item => item.field === field);
+    const key = sorting[index];
+    return <th scope="col" aria-sort={index === 0 ? key.ascending ? 'ascending' : 'descending' : undefined}>
+      <button className="g5-teacher-sort" onClick={e => changeSort(field, addSort || e.shiftKey)}>
+        {sortLabels[field]}{key && <small>{index + 1}{key.ascending ? '↑' : '↓'}</small>}
+      </button>
+    </th>;
+  }
 
-  const handleExportCSV = () => {
-    // Prefer server CSV (authoritative)
-    const a = document.createElement('a');
-    a.href = teacherExportUrl(selectedClass === 'all' ? undefined : selectedClass);
-    a.download = `五年级第7课_课堂数据_${selectedClass}_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-  };
-
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortAsc(!sortAsc);
-    } else {
-      setSortField(field);
-      setSortAsc(true);
+  async function toggleExam() {
+    if (!payload?.canManageExam || selectedClass === 'all' || saving) return;
+    const classId = selectedClass;
+    setSaving(true);
+    setOperationMessage('');
+    try {
+      const result = await apiSetClassExamPaused(classId, !payload.examPauses[classId]);
+      setPayload(previous => previous && { ...previous, examPauses: { ...previous.examPauses, [classId]: result.closed } });
+      setOperationMessage(`${classId} 班考核已${result.closed ? '暂停' : '重新开放'}。`);
+      await refresh();
+    } catch (error) {
+      setOperationMessage(error instanceof Error ? error.message : '操作失败，请重试。');
+    } finally {
+      setSaving(false);
     }
-  };
+  }
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col p-6 select-none font-sans">
-      {(loadError || loading) && (
-        <div className={`mb-3 text-xs px-3 py-2 rounded-lg ${loadError ? 'bg-rose-600/80' : 'bg-slate-800'} border border-slate-700`}>
-          {loadError ? `服务端：${loadError}` : '正在同步教师大屏…'}
-          {payload?.updatedAt ? ` · 更新于 ${payload.updatedAt}` : ''}
+  const classRoster = payload ? payload.students
+    .filter(({ student }) => student.rosterSource === 'roster' &&
+      (selectedClass === 'all' || student.classId === selectedClass))
+    .map(overviewPupil) : null;
+  const hasFilters = !!searchQuery.trim() || [passFilter, targetFilter, evidenceFilter, supportFilter].some(value => value !== 'all') ||
+    !!(firstRange.min || firstRange.max || latestRange.min || latestRange.max);
+  const overviewRows = rows.map(overviewPupil);
+  const isClassSelected = selectedClass !== 'all';
+  const isPaused = payload?.examPauses[selectedClass];
+  const examStatus = !isClassSelected ? '选择班级后查看考核状态'
+    : !payload ? '考核状态尚未获取'
+    : isPaused ? '考核已暂停' : '考核开放中';
+  const localTeacherUrl = new URL('/teacher', window.location.href);
+  localTeacherUrl.hostname = 'localhost';
+
+  const filters = (
+    <details className="g5-teacher-card g5-teacher-filters">
+      <summary>
+        <strong>明细筛选</strong>
+        <span>{hasFilters ? '已应用筛选 · ' : ''}{payload ? `${rows.length} 人` : '等待数据'}</span>
+      </summary>
+      <div className="g5-teacher-filter-body">
+        <div className="g5-teacher-filter-grid">
+          <label>学生姓名
+            <input aria-label="学生姓名" className={control} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="搜索姓名" />
+          </label>
+          <label>考核状态
+            <select aria-label="考核状态" className={control} value={passFilter} onChange={e => setPassFilter(e.target.value)}>
+              <option value="all">全部考核状态</option><option value="passed">已达标</option><option value="failed">未达标</option><option value="no_record">尚无考核记录</option>
+            </select>
+          </label>
+          <label>首答目标
+            <select aria-label="首答目标" className={control} value={targetFilter} onChange={e => setTargetFilter(e.target.value)}>
+              <option value="all">全部首答目标</option><option value="g1:met">G1 达到一半</option><option value="g1:below">G1 待巩固</option><option value="g2:met">G2 达到一半</option><option value="g2:below">G2 待巩固</option>
+            </select>
+          </label>
+          <label>探究证据
+            <select aria-label="探究证据" className={control} value={evidenceFilter} onChange={e => setEvidenceFilter(e.target.value)}>
+              <option value="all">全部探究证据</option><option value="recorded">已有证据</option><option value="none">尚无证据</option><option value="revision">有修订记录</option><option value="confirmed">有完成确认</option>
+            </select>
+          </label>
+          <label>概念支持
+            <select aria-label="概念支持" className={control} value={supportFilter} onChange={e => setSupportFilter(e.target.value)}>
+              <option value="all">全部支持状态</option><option value="used">有概念支持记录</option><option value="none">尚无支持记录</option>
+            </select>
+          </label>
         </div>
-      )}
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4">
+        <div className="g5-teacher-range">
+          {([{ title: '首答分数', range: firstRange, change: setFirstRange }, { title: '最近分数', range: latestRange, change: setLatestRange }]).map(({ title, range, change }) =>
+            <div key={title}><span>{title}</span>
+              <input aria-label={`${title}下限`} className={control} type="number" min={0} max={16} value={range.min} onChange={e => change({ ...range, min: e.target.value })} />
+              <span>至</span>
+              <input aria-label={`${title}上限`} className={control} type="number" min={0} max={16} value={range.max} onChange={e => change({ ...range, max: e.target.value })} />
+            </div>)}
+        </div>
+      </div>
+    </details>
+  );
+
+  return <div className="g5-teacher">
+    <header className="g5-teacher-top">
+      <div className="g5-teacher-top-inner">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
-            <h1 className="text-xl font-bold text-white">
-              五年级《身边的算法》第7课《重复操作用循环》· 教师大屏
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-              免密实时监控
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            莲花山智慧路口三站探究进度 · 分层考核达标率 · 法宝使用与错因诊断
-          </p>
+          <p className="g5-teacher-eyebrow">五年级第7课 · 莲花山智慧路口 · 重复操作用循环</p>
+          <h1>教师观察大屏</h1>
         </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md transition flex items-center gap-1.5"
-          >
-            <span>📥 导出课堂 CSV 报表</span>
-          </button>
-          {onBackToApp && (
-            <button
-              type="button"
-              onClick={onBackToApp}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-            >
-              返回学生端
-            </button>
-          )}
+        <div className="g5-teacher-sync">
+          <strong><span aria-hidden="true" data-error={!!loadError} />课堂数据</strong>
+          <p aria-live="polite">{loadError ? '同步遇到问题' : payload ? `更新于 ${formatTime(payload.updatedAt)}` : '等待同步'}</p>
         </div>
       </div>
+    </header>
 
-      {/* KPI Cards (Fixed Denominator per spec) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {/* Total login */}
-        <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
-          <div className="text-[11px] font-semibold text-slate-400">已登录人数</div>
-          <div className="text-2xl font-black text-white mt-1">
-            {stats.loggedCount}
-            <span className="text-xs text-slate-500 font-normal"> / {stats.totalCount} (固定分母)</span>
-          </div>
+    <main className="g5-teacher-main">
+      {loadError && <p role="status" className="g5-teacher-notice">课堂数据暂时无法更新。{loadError}。可点击「立即刷新」重试。</p>}
+
+      <section aria-label="班级和课堂管理" className="g5-teacher-card g5-teacher-toolbar">
+        <label>查看班级
+          <select aria-label="班级" className={control} value={selectedClass} onChange={e => { setSelectedClass(e.target.value); setOperationMessage(''); }}>
+            <option value="all">全部班级</option>{classIds.map(id => <option key={id} value={id}>{id} 班</option>)}
+          </select>
+        </label>
+        <div className="g5-teacher-actions">
+          <span className="g5-teacher-badge" data-tone={!isClassSelected || !payload ? 'neutral' : isPaused ? 'warn' : 'ok'}>{examStatus}</span>
+          {isClassSelected && payload?.canManageExam && <button className={button} disabled={saving} onClick={() => void toggleExam()}>
+            {saving ? '正在保存…' : isPaused ? '重新开放本班考核' : '暂停本班考核'}
+          </button>}
+          <button className={button} onClick={() => void refresh()}>立即刷新</button>
+          <a className={button} href={teacherExportUrl(isClassSelected ? selectedClass : undefined)} download>导出课堂 CSV</a>
+          {onBackToApp && <button className={button} onClick={onBackToApp}>返回学生端</button>}
         </div>
+        {isClassSelected && payload && !payload.canManageExam && <p className="g5-teacher-toolbar-note">考核开关可在运行课堂服务的电脑上操作。<a href={localTeacherUrl.href}>本机教师大屏</a></p>}
+        {operationMessage && <p className="g5-teacher-toolbar-note" role="status">{operationMessage}</p>}
+      </section>
 
-        {/* S1 Rate */}
-        <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
-          <div className="text-[11px] font-semibold text-slate-400">S1 过街引导完成率</div>
-          <div className="text-2xl font-black text-amber-400 mt-1">{stats.s1Pct}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">{stats.s1Detail}</div>
+      <TeacherOverview selectedClass={selectedClass} classRoster={classRoster} rows={overviewRows} filters={filters} />
+
+      {(payload || loading) && <RewardLeaderboard entries={payload?.rewardLeaderboard ?? []} selectedClass={selectedClass} pending={!payload} />}
+
+      <section aria-labelledby="g5-student-records" className="g5-teacher-card g5-teacher-students">
+        <div className="g5-teacher-section-head">
+          <div><p className="g5-teacher-eyebrow">学生明细</p><h2 id="g5-student-records">当前课堂记录</h2></div>
+          <p>点击列名切换升降序，展开明细查看各站证据。</p>
         </div>
-
-        {/* S2 Rate */}
-        <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
-          <div className="text-[11px] font-semibold text-slate-400">S2 循环拆解完成率</div>
-          <div className="text-2xl font-black text-amber-400 mt-1">{stats.s2Pct}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">{stats.s2Detail}</div>
+        <div className="g5-teacher-sort-row">
+          <span>排序 {sorting.map(({ field, ascending }) => `${sortLabels[field]}${ascending ? ' ↑' : ' ↓'}`).join(' → ')}</span>
+          <label><input type="checkbox" checked={addSort} onChange={e => setAddSort(e.target.checked)} />叠加排序</label>
+          <button className="g5-teacher-sort" onClick={() => setSorting(defaultSorting)}>重置排序</button>
         </div>
-
-        {/* S3 Rate */}
-        <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
-          <div className="text-[11px] font-semibold text-slate-400">S3 时长调度完成率</div>
-          <div className="text-2xl font-black text-amber-400 mt-1">{stats.s3Pct}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">{stats.s3Detail}</div>
-        </div>
-
-        {/* Exam pass rate */}
-        <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
-          <div className="text-[11px] font-semibold text-slate-400">基础考核达标率</div>
-          <div className="text-2xl font-black text-emerald-400 mt-1">
-            {stats.examPct}
-            <span className="text-[10px] text-slate-400 font-normal ml-1">(≥13题)</span>
-          </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">{stats.examDetail}</div>
-        </div>
-
-        {/* Relic average use */}
-        <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700">
-          <div className="text-[11px] font-semibold text-slate-400">法宝人均使用</div>
-          <div className="text-2xl font-black text-cyan-400 mt-1">
-            {stats.avgRelicUse}
-            <span className="text-xs text-slate-500 font-normal"> / 3次</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and Query Bar */}
-      <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3 shadow">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Class Select */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400">班级：</span>
-            <select
-              value={selectedClass}
-              onChange={e => setSelectedClass(e.target.value)}
-              className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-500"
-            >
-              <option value="all">全年级 (501–504 · 共212人)</option>
-              <option value="501">501 班 (53人)</option>
-              <option value="502">502 班 (53人)</option>
-              <option value="503">503 班 (52人)</option>
-              <option value="504">504 班 (54人)</option>
-            </select>
-          </div>
-
-          {/* Pass status */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400">考核状态：</span>
-            <select
-              value={passFilter}
-              onChange={e => setPassFilter(e.target.value as any)}
-              className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-500"
-            >
-              <option value="all">全部状态</option>
-              <option value="passed">已达标 (≥13分)</option>
-              <option value="failed">未达标</option>
-              <option value="no_record">尚无考核证据</option>
-            </select>
-          </div>
-
-          {/* Search name */}
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="搜索姓名..."
-            className="bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-amber-500 w-36"
-          />
-        </div>
-
-        <div className="text-xs text-slate-400">
-          显示 <strong className="text-amber-400">{sortedRows.length}</strong> / {totalRosterCount} 位学生
-        </div>
-      </div>
-
-      {/* Main Student Data Table */}
-      <div className="flex-1 bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden shadow-xl flex flex-col">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/90 text-slate-400 uppercase text-[11px] border-b border-slate-700 select-none">
-              <tr>
-                <th onClick={() => handleSort('classId')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  班级 {sortField === 'classId' && (sortAsc ? '▲' : '▼')}
-                </th>
-                <th onClick={() => handleSort('name')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  姓名 {sortField === 'name' && (sortAsc ? '▲' : '▼')}
-                </th>
-                <th className="py-3 px-3">登录态</th>
-                <th onClick={() => handleSort('s1Ok')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  S1过街 {sortField === 's1Ok' && (sortAsc ? '▲' : '▼')}
-                </th>
-                <th onClick={() => handleSort('s2Ok')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  S2拆解 {sortField === 's2Ok' && (sortAsc ? '▲' : '▼')}
-                </th>
-                <th onClick={() => handleSort('s3Ok')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  S3调度 {sortField === 's3Ok' && (sortAsc ? '▲' : '▼')}
-                </th>
-                <th onClick={() => handleSort('examScore')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  基础考核 {sortField === 'examScore' && (sortAsc ? '▲' : '▼')}
-                </th>
-                <th className="py-3 px-3">G1/G2目标</th>
-                <th onClick={() => handleSort('passed')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  达标状态 {sortField === 'passed' && (sortAsc ? '▲' : '▼')}
-                </th>
-                <th className="py-3 px-3">挑战加分</th>
-                <th onClick={() => handleSort('relicUsed')} className="py-3 px-3 cursor-pointer hover:text-white">
-                  法宝使用 {sortField === 'relicUsed' && (sortAsc ? '▲' : '▼')}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {sortedRows.map(row => (
-                <tr key={row.student.studentId} className="hover:bg-slate-800/50 transition">
-                  <td className="py-2.5 px-3 font-semibold text-slate-300">
-                    {row.student.classId} 班
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-white">
-                    {row.student.name}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    {row.isLoggedIn ? (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/40">
-                        在线
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-500">未登录</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    {row.s1Ok ? (
-                      <span className="text-emerald-400 font-bold">✓ 完成</span>
-                    ) : (
-                      <span className="text-slate-500 italic">尚无证据</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    {row.s2Ok ? (
-                      <span className="text-emerald-400 font-bold">✓ 完成</span>
-                    ) : (
-                      <span className="text-slate-500 italic">尚无证据</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    {row.s3Ok ? (
-                      <span className="text-emerald-400 font-bold">✓ 完成</span>
-                    ) : (
-                      <span className="text-slate-500 italic">尚无证据</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    {row.examScore !== undefined ? (
-                      <span className="font-mono font-bold text-amber-300">
-                        {row.examScore} / 16
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 italic">尚无证据</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3 text-[11px]">
-                    {row.g1Score !== undefined ? (
-                      <span>G1:{row.g1Score}/5 · G2:{row.g2Score}/3</span>
-                    ) : (
-                      <span className="text-slate-500 italic">尚无证据</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    {row.passed ? (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/50">
-                        达标 (≥13)
-                      </span>
-                    ) : row.examScore !== undefined ? (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-semibold border border-amber-500/40">
-                        未达标
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 italic">尚无证据</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3 text-[11px]">
-                    {row.challengeScore !== undefined ? (
-                      <span className={row.challengeBonus ? 'text-purple-300 font-bold' : 'text-slate-400'}>
-                        {row.challengeScore}/6 {row.challengeBonus && '★加分'}
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 italic">尚无证据</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3 text-[11px] font-mono text-slate-300">
-                    {row.relicUsed} / 3 次
-                  </td>
+        <div className="g5-teacher-table-wrap" role="region" aria-label="学生明细表" tabIndex={0}>
+          <table className="g5-teacher-table">
+            <thead><tr>
+              {sortHeader('classId')}{sortHeader('name')}<th scope="col">进入情况</th><th scope="col">三站</th>
+              {sortHeader('first')}{sortHeader('latest')}<th scope="col">首答目标</th>
+              <th scope="col">达标</th><th scope="col">挑战</th>{sortHeader('support')}{sortHeader('lastSync')}<th scope="col">证据</th>
+            </tr></thead>
+            <tbody>{rows.map(row => {
+              const first = firstResult(row), latest = recentResult(row);
+              const id = row.student.studentId, open = expanded === id;
+              const [s1, s2, s3] = stationFlags(row);
+              const completed = [s1, s2, s3].filter(Boolean).length;
+              const challenge = row.challengeFirstComplete ? row.challengeFirstResult : null;
+              return <React.Fragment key={id}>
+                <tr data-absent={!row.entered}>
+                  <td>{row.student.classId}</td><th scope="row">{row.student.name}</th>
+                  <td><span className="g5-teacher-badge" data-tone={row.entered ? 'ok' : 'neutral'}>{row.entered ? '已进入' : '未进入'}</span></td>
+                  <td title={`第一站${s1 ? '完成' : '尚无完成记录'} · 第二站${s2 ? '完成' : '尚无完成记录'} · 第三站${s3 ? '完成' : '尚无完成记录'}`}><strong className="g5-teacher-count">{completed}</strong> / 3</td>
+                  <td>{!first && row.incompleteScores?.base !== undefined ? '旧卷未填完整' : scoreLabel(first)}</td><td>{scoreLabel(latest)}</td><td>{goalLabel(first)}</td>
+                  <td>{first ? <span className="g5-teacher-badge" data-tone={first.passed ? 'ok' : 'warn'}>{first.passed ? '达标' : '未达标'}</span> : '—'}</td>
+                  <td>{challenge ? `${challenge.challengeScore ?? 0}/${challenge.challengeTotal ?? 6}${challenge.challengePassed ? ' · 加分' : ''}` : '尚无记录'}</td>
+                  <td>{row.entered ? `${row.relics.used} / 3` : '—'}</td>
+                  <td>{formatTime(row.lastSync)}</td>
+                  <td><button className="g5-teacher-evidence-button" aria-expanded={open} aria-label={`${open ? '收起' : '查看'}${row.student.name}明细`} onClick={() => setExpanded(open ? null : id)}>{open ? '收起证据' : '查看证据'}</button></td>
                 </tr>
-              ))}
-            </tbody>
+                {open && <tr className="g5-teacher-evidence-row"><td colSpan={12}><PupilEvidence row={row} evidence={evidenceByPupil.get(id) || []}/></td></tr>}
+              </React.Fragment>;
+            })}
+            {!rows.length && <tr><td className="g5-teacher-empty" colSpan={12}>{loading && !payload ? '正在加载' : loadError && !payload ? '课堂数据尚未获取' : '暂无符合条件的记录'}</td></tr>}</tbody>
           </table>
         </div>
-      </div>
-    </div>
-  );
+        <p className="g5-teacher-footnote">未提交基础考核的学生排在有成绩者之后。必做探究与选做记录在明细中分别显示。</p>
+      </section>
+    </main>
+  </div>;
 };

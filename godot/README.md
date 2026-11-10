@@ -17,7 +17,8 @@ godot/
 
 ## 本地导出
 ```bash
-godot --headless --path godot/project --export-release Web godot/export/web/index.html
+godot --headless --path godot/project --export-release Web "$PWD/godot/export/web/index.html"
+cp godot/bridge/classroom_bridge.js godot/export/web/
 cp -R godot/export/web/* public/godot/
 ```
 变体：无线程 Web（`variant/thread_support=false`）以兼容课堂 HTTP。

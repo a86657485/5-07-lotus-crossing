@@ -23,6 +23,10 @@ var station_host: Control
 var quest_drawer: Control
 var move_lock_reasons: Dictionary = {}
 var world: Node2D
+var _use_web_panels := false
+var _host_session_loaded := false
+var _relic_pending := false
+var exam_button: Button
 
 var s1: Control
 var s2a: Control
@@ -67,7 +71,8 @@ func _ready() -> void:
 			UiTheme.apply_to(quest_drawer)
 	ClassroomBridge.session_received.connect(_on_session)
 	ClassroomBridge.story_replay_request.connect(_on_replay_req)
-	GameState.exam_opened.connect(_on_exam_opened)
+	ClassroomBridge.flow_result.connect(_on_web_flow_result)
+	ClassroomBridge.relic_result.connect(_on_relic_result)
 	GameState.stations_changed.connect(_refresh_teleports)
 	call_deferred("_start_flow")
 	if "--smoke" in OS.get_cmdline_user_args() or "--smoke" in OS.get_cmdline_args():
@@ -79,13 +84,46 @@ func _ready() -> void:
 
 
 func _start_flow() -> void:
+	while OS.has_feature("web") and not _host_session_loaded:
+		await ClassroomBridge.session_received
 	if GameState.intro_seen:
 		_show_hub()
 	else:
 		_play_intro_illustrated(false)
 
 func _on_session(_data: Dictionary) -> void:
+	if _data.has("webPanels"):
+		_use_web_panels = bool(_data["webPanels"])
+		_host_session_loaded = true
+	if GameState.intro_seen and dialogue and dialogue.has_method("mark_seen"):
+		dialogue.mark_seen()
 	_refresh_teleports()
+
+func _open_web_panel(panel_id: String) -> bool:
+	if not OS.has_feature("web") or not _use_web_panels:
+		return false
+	ClassroomBridge.flow_open(panel_id)
+	return true
+
+func _on_web_flow_result(data: Dictionary) -> void:
+	var panel_id := str(data.get("panelId", ""))
+	if not _use_web_panels or panel_id != GameState.active_station:
+		return
+	if bool(data.get("reset", false)):
+		var task_ids := {"s1": GameState.TASK_S2A, "s2b": GameState.TASK_S2B, "s2c": GameState.TASK_S2C, "s3": GameState.TASK_S3}
+		GameState.reset_station(task_ids[panel_id])
+		return
+	ClassroomBridge.flow_close(panel_id)
+	if bool(data.get("cancelled", false)):
+		_show_hub()
+		return
+	if not bool(data.get("correct", false)):
+		return
+	match panel_id:
+		"s1": _on_s1_done(data)
+		"s2b": _on_s2b_done(data)
+		"s2c": _on_s2c_done(data)
+		"s3": _on_s3_done(data)
 
 func _build_world() -> void:
 	world = Node2D.new()
@@ -95,13 +133,16 @@ func _build_world() -> void:
 	var has_hub_bg := ResourceLoader.exists("res://assets/sprites/ai/scenes/street_hub_bg.png") 		or ResourceLoader.exists("res://assets/sprites/scenes/street_hub_bg.png")
 	if has_hub_bg:
 		var bg_tex: Texture2D = null
-		if ResourceLoader.exists("res://assets/sprites/ai/scenes/street_hub_bg.png"):
+		if ResourceLoader.exists("res://assets/sprites/scenes/crossing_redesign.png"):
+			bg_tex = load("res://assets/sprites/scenes/crossing_redesign.png")
+		elif ResourceLoader.exists("res://assets/sprites/ai/scenes/street_hub_bg.png"):
 			bg_tex = load("res://assets/sprites/ai/scenes/street_hub_bg.png")
 		else:
 			bg_tex = load("res://assets/sprites/scenes/street_hub_bg.png")
 		var bg_sp := Sprite2D.new()
 		bg_sp.name = "StreetHubBG"
 		bg_sp.texture = bg_tex
+		bg_sp.scale = Vector2(1280.0 / bg_tex.get_width(), 720.0 / bg_tex.get_height())
 		bg_sp.centered = false
 		bg_sp.position = Vector2.ZERO
 		bg_sp.z_index = -20
@@ -506,6 +547,19 @@ func _build_ui() -> void:
 			b.add_theme_font_size_override("font_size", 18)
 		b.pressed.connect(_teleport.bind(str(item[1]), item[2]))
 		teleport_bar.add_child(b)
+	exam_button = Button.new()
+	exam_button.name = "ExamButton"
+	exam_button.text = "进入考核"
+	exam_button.custom_minimum_size = Vector2(130, 48)
+	if UiTheme.ui_font:
+		exam_button.add_theme_font_override("font", UiTheme.ui_font)
+		exam_button.add_theme_font_size_override("font_size", 18)
+	exam_button.disabled = true
+	exam_button.pressed.connect(func():
+		if GameState.exam_ready() or GameState.exam_available:
+			ClassroomBridge.open_exam()
+	)
+	teleport_bar.add_child(exam_button)
 
 	var replay_btn := Button.new()
 	replay_btn.text = "剧情回放"
@@ -557,6 +611,8 @@ func _build_ui() -> void:
 	station_host.set_anchors_preset(Control.PRESET_FULL_RECT)
 	station_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(station_host)
+	ui.move_child(relic_hud, ui.get_child_count() - 1)
+	ui.move_child(dialogue, ui.get_child_count() - 1)
 
 func _make_modal(p_name: String, pos: Vector2, size: Vector2) -> PanelContainer:
 	var p := PanelContainer.new()
@@ -604,7 +660,7 @@ func _load_station(p_name: String, script_path: String, tree_builder: Callable) 
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
+	dim.color = Color(0.12, 0.24, 0.35, 0.25)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(dim)
 	var panel := PanelContainer.new()
@@ -742,6 +798,7 @@ func _refresh_quest() -> void:
 		quest_drawer.refresh_from_state()
 
 func _play_station_dialogue(lines: Array, closable: bool, on_done: Callable) -> void:
+	_hide_stations()
 	if dialogue == null or not dialogue.has_method("play"):
 		on_done.call()
 		return
@@ -904,6 +961,8 @@ func _open_s1() -> void:
 		{"speaker": "阿莲", "text": "开放日队伍乱了，有人要乱穿。", "image": "res://assets/story/cg_s1_queue.png"},
 		{"speaker": "阿莲", "text": "帮我把『一直等』画成带回箭头的图。", "image": "res://assets/story/cg_s1_queue.png"},
 	], false, func():
+		if _open_web_panel("s1"):
+			return
 		s1.visible = true
 		if s1.has_method("open_station"):
 			s1.open_station()
@@ -931,6 +990,7 @@ func _open_s2_flow() -> void:
 	close_b.pressed.connect(func():
 		modal.visible = false
 		_set_move_lock("learn", false)
+		_show_hub()
 	)
 	next_b.pressed.connect(func():
 		modal.visible = false
@@ -951,6 +1011,8 @@ func _open_s2b() -> void:
 	GameState.active_station = "s2b"
 	_set_move_lock("station", true)
 	_set_task("两张屏都有菱形。哪张在问还要不要再做？")
+	if _open_web_panel("s2b"):
+		return
 	s2b.visible = true
 	if s2b.has_method("open_station"):
 		s2b.open_station()
@@ -962,6 +1024,8 @@ func _open_s2c() -> void:
 	GameState.active_station = "s2c"
 	_set_move_lock("station", true)
 	_set_task("阿莲：休息点的壶也在反复加热，先标清楚。")
+	if _open_web_panel("s2c"):
+		return
 	s2c.visible = true
 	if s2c.has_method("open_station"):
 		s2c.open_station()
@@ -977,6 +1041,8 @@ func _open_s3() -> void:
 		{"speaker": "阿莲", "text": "路口堵了，时长好像设错了。", "image": "res://assets/story/cg_s3_booth.png"},
 		{"speaker": "阿莲", "text": "先运行看堵，再改时长核对。", "image": "res://assets/story/cg_s3_booth.png"},
 	], false, func():
+		if _open_web_panel("s3"):
+			return
 		s3.visible = true
 		if s3.has_method("open_station"):
 			s3.open_station()
@@ -1014,13 +1080,13 @@ func _envelope(task_id: String, data: Dictionary) -> Dictionary:
 
 func _on_s1_done(data: Dictionary) -> void:
 	# 主证据 E1 → taskId s2_rewrite；s1_order 仅可选附属不过问
-	GameState.set_station_done(GameState.TASK_S2A, true)
-	GameState.set_station_done(GameState.TASK_S1, true)
 	GameState.unlocked_relics["whistle"] = true
 	var payload = data.duplicate(true)
 	if not payload.has("evidenceCode"):
 		payload["evidenceCode"] = "E1"
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2A, payload))
+	GameState.set_station_done(GameState.TASK_S2A, true)
+	GameState.set_station_done(GameState.TASK_S1, true)
 	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S2B, "unlocked": true})
 	_play_station_dialogue([
 		{"speaker": "阿莲", "text": "接对了，行人按序走。", "image": "res://assets/story/cg_s1_flow_ok.png"},
@@ -1031,21 +1097,21 @@ func _on_s1_done(data: Dictionary) -> void:
 	)
 
 func _on_s2a_done(data: Dictionary) -> void:
-	GameState.set_station_done(GameState.TASK_S2A, true)
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2A, data))
+	GameState.set_station_done(GameState.TASK_S2A, true)
 	_toast("阿莲：接对了，灯会再闪一轮。")
 	_open_s2b()
 
 func _on_s2b_done(data: Dictionary) -> void:
-	GameState.set_station_done(GameState.TASK_S2B, true)
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2B, data))
+	GameState.set_station_done(GameState.TASK_S2B, true)
 	_toast("阿莲：选路各走一次；循环是再做一遍。")
 	_open_s2c()
 
 func _on_s2c_done(data: Dictionary) -> void:
-	GameState.set_station_done(GameState.TASK_S2C, true)
 	GameState.unlocked_relics["arrow"] = true
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S2C, data))
+	GameState.set_station_done(GameState.TASK_S2C, true)
 	ClassroomBridge.emit_to_js("station:unlock", {"taskId": GameState.TASK_S3, "unlocked": true})
 	_set_move_lock("station", false)
 	_toast("阿莲：反复说清了，也分清了『再等』和『选路』。\n阿莲：这枚箭头给你。调度亭那边还在堵。")
@@ -1054,16 +1120,16 @@ func _on_s2c_done(data: Dictionary) -> void:
 	_refresh_quest()
 
 func _on_s3_done(data: Dictionary) -> void:
-	GameState.set_station_done(GameState.TASK_S3, true)
 	GameState.unlocked_relics["knob"] = true
 	if data.has("s3Detail") and data["s3Detail"] != null:
 		GameState.s3_detail = data["s3Detail"]
 	ClassroomBridge.report_evidence(_envelope(GameState.TASK_S3, data))
+	GameState.set_station_done(GameState.TASK_S3, true)
 	ClassroomBridge.emit_to_js("progress:s3Detail", GameState.s3_detail)
 	_set_move_lock("station", false)
 	_play_station_dialogue([
-		{"speaker": "阿莲", "text": "时长设对了，路口顺多了。", "image": "res://assets/story/cg_exam_ready.png"},
-		{"speaker": "阿莲", "text": "三站稳住了。可以去考核了。", "image": "res://assets/story/cg_exam_ready.png"},
+		{"speaker": "阿莲", "text": "这次模拟中，这一侧排队少了，另一侧等得更久。", "image": "res://assets/story/cg_exam_ready.png"},
+		{"speaker": "阿莲", "text": "三站的记录齐了，可以去考核。", "image": "res://assets/story/cg_exam_ready.png"},
 	], true, func():
 		_on_exam_opened()
 		_refresh_quest()
@@ -1074,38 +1140,49 @@ func _on_exam_opened() -> void:
 	_set_task("系统：三站完成，开始当课小测。（考核在网页侧）")
 
 func _on_relic() -> void:
+	if _relic_pending:
+		return
 	if GameState.relic_remaining <= 0:
 		_toast("法宝已用完。")
 		return
-	# 指路不代做
-	var tip := _relic_tip()
-	_toast(tip)
 	if OS.has_feature("web"):
+		_relic_pending = true
+		relic_hud.get_node("UseBtn").disabled = true
 		ClassroomBridge.use_relic()
+	elif GameState.consume_relic_local():
+		_toast(_relic_tip())
+
+func _on_relic_result(success: bool) -> void:
+	if not _relic_pending:
+		return
+	_relic_pending = false
+	relic_hud.get_node("UseBtn").disabled = false
+	if success:
+		_toast(_relic_tip())
 	else:
-		GameState.consume_relic_local()
+		_toast("暂时无法确认次数。连上课堂服务后再试。")
 
 func _relic_tip() -> String:
 	match GameState.active_station:
 		"s1":
 			if s1 and s1.has_method("highlight_for_relic"):
 				return "法宝：" + s1.highlight_for_relic()
-			return "法宝：把一直等改成：问还要不要再观察。点『是』拉回观察框。"
+			return "法宝：判断完以后，想想哪个结果需要再做一次。"
 		"s2a":
-			return "法宝：看哪张有箭头绕回来——那才是『再做』。"
+			return "法宝：沿着箭头看一遍，比较哪一步还会出现。"
 		"s2b":
 			if s2b and s2b.has_method("highlight_for_relic"):
 				return "法宝：" + s2b.highlight_for_relic()
-			return "法宝：看哪张有箭头绕回来——那才是『再做』。"
+			return "法宝：沿着箭头看一遍，比较哪一步还会出现。"
 		"s2c":
-			return "法宝：先问够不够：不够才加热，再检测——先问先做。"
+			return "法宝：比较两种水温，哪种情形会多做一步？"
 		"s3":
 			var g = GameState.gate_states.get(GameState.TASK_S3, "pre_missing")
 			if g == "pre_missing":
 				return "法宝：先点「运行路口」看清故障。"
 			return "法宝：已见故障——选时长与理由，再运行核对（勿只重复跑故障）。"
 		_:
-			return "法宝：按任务单顺序，先去引导台。"
+			return "法宝：" + _next_task_line(_next_focus_id())
 
 func _reset_current() -> void:
 	var map := {"s1": GameState.TASK_S2A, "s2a": GameState.TASK_S2B, "s2b": GameState.TASK_S2B, "s2c": GameState.TASK_S2C, "s3": GameState.TASK_S3}
@@ -1143,11 +1220,15 @@ func _next_task_line(focus_id: String) -> String:
 		"teleport_s3":
 			return "阿莲：调度亭还在堵，去调时长。"
 		"exam":
-			return "系统：三站稳住了，开始当课小测。"
+			return "检测已完成，可再次检测或回看三站。" if bool(GameState.stations.get("exam", false)) else "三站完成，点击「进入考核」。"
 		_:
 			return "听阿莲安排，一站站帮上忙。"
 
 func _refresh_teleports() -> void:
+	if exam_button:
+		exam_button.disabled = not (GameState.exam_ready() or GameState.exam_available)
+		exam_button.text = "再次检测" if bool(GameState.stations.get("exam", false)) else "进入考核"
+		exam_button.modulate = Color(1.15, 0.95, 0.55, 1.0) if _next_focus_id() == "exam" else Color.WHITE
 	# 唯一「下一步」琥珀高亮；未解锁禁用；其余弱化
 	if teleport_bar == null:
 		return

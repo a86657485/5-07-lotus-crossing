@@ -48,6 +48,18 @@ export interface S3State {
   revalidateOk: boolean;
 }
 
+export interface LearningEvidence {
+  eventId: string;
+  taskId: TaskId | 'intro';
+  eventType: 'attempt' | 'evidence_attempt' | 'case_run' | 'scenario_run' | 'simulation_run' | 'evidence_lock' | 'station_reset' | 'current_invalidated';
+  correct?: boolean | null;
+  payload?: Record<string, unknown>;
+  clientTs?: string | null;
+  s3Detail?: S3State | null;
+  attemptKind?: 'first' | 'revision' | 'process' | 'confirmation' | 'unknown';
+  receivedAt?: string;
+}
+
 export interface QuestionClient {
   id: string;
   tier: 'base' | 'challenge';
@@ -94,11 +106,23 @@ export interface ExamEvaluationResult {
     correct: boolean;
     tier: 'base' | 'challenge';
     misconceptionId?: string;
+    misconceptionIds?: string[];
   }[];
+}
+
+export type ExamAnswer = string | Record<string, string>;
+export interface ExamReviewItem {
+  questionId: string;
+  correct: boolean;
+  submittedAnswer: ExamAnswer;
+  correctAnswer: ExamAnswer;
+  analysis: string;
+  relatedTaskId?: string;
 }
 
 export interface StudentSessionRecord {
   student: Student;
+  stateVersion?: number;
   startedAt: string;
   lastActiveAt: string;
   stations: StationProgress;
@@ -110,7 +134,20 @@ export interface StudentSessionRecord {
     misconceptionId?: string;
     ts: string;
   }[];
+  evidenceHistory?: LearningEvidence[];
+  priorEvidenceUnknown?: boolean;
   examResult?: ExamEvaluationResult;
+  examFirstResult?: ExamEvaluationResult | null;
+  challengeFirstResult?: ExamEvaluationResult | null;
+  examLatestResult?: ExamEvaluationResult | null;
+  examFirstAnswers?: Record<string, any> | null;
+  challengeFirstAnswers?: Record<string, any> | null;
   examAnswers?: Record<string, any>;
+  examFeedback?: Partial<Record<'base' | 'challenge', ExamReviewItem[]>>;
+  legacyIncompleteExam?: Partial<Record<'base' | 'challenge', {
+    result: ExamEvaluationResult;
+    answers: Record<string, ExamAnswer> | null;
+    archivedAt: string;
+  }>>;
   rewardUnlocked: boolean;
 }

@@ -52,11 +52,16 @@ var gate_states: Dictionary = {
 }
 
 var intro_seen: bool = false
+var exam_available: bool = false
 var current_focus: String = "teleport_s1"
 var active_station: String = ""  # hub | s1 | s2a | s2b | s2c | s3 | intro
 var fail_counts: Dictionary = {}
 
 func apply_session(data: Dictionary) -> void:
+	if data.has("examOpen"):
+		exam_available = bool(data["examOpen"])
+	if bool(data.get("introSeen", false)):
+		intro_seen = true
 	student_id = str(data.get("studentId", student_id))
 	class_id = str(data.get("classId", class_id))
 	display_name = str(data.get("displayName", display_name))
@@ -65,6 +70,8 @@ func apply_session(data: Dictionary) -> void:
 	if data.has("relicRemaining"):
 		relic_remaining = int(data["relicRemaining"])
 		relic_used = maxi(0, relic_quota - relic_remaining)
+	if data.has("s3Detail") and data["s3Detail"] is Dictionary:
+		s3_detail.merge(data["s3Detail"], true)
 	relic_changed.emit()
 
 func sync_stations(src: Dictionary) -> void:
