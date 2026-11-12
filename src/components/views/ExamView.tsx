@@ -307,6 +307,11 @@ export const ExamView: React.FC<ExamViewProps> = ({
           <section className="exam-stage" data-exam-question={question.id} data-exam-visual={showFigure ? 'figure' : 'recall'}>
             <div className="exam-meta">
               <p>第 {index + 1} 题 / 共 {currentQuestions.length} 题 · 题号：{question.id} · 已答完整 {totalAnswered} 题</p>
+              {!baseComplete && (
+                <p className="text-xs font-medium text-amber-200/90">
+                  答案只存在这台电脑的浏览器里，换设备或清除浏览记录会丢失，答完请马上点「提交」。
+                </p>
+              )}
               <nav aria-label="题号跳转" className="exam-qnav">
                 {currentQuestions.map((q, i) => {
                   const complete = isQuestionComplete(q, answers[q.id]);

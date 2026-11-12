@@ -52,3 +52,30 @@
 .timing-entry-row{align-items:center}.timing-entry{gap:9px;justify-content:flex-start;padding-left:18px;max-width:420px}.timing-prediction-summary{font-size:13px;font-weight:650;color:#547a94;padding:5px 10px}.timing-backdrop{z-index:88}.timing-comparison{position:relative;width:min(850px,96vw);max-height:94dvh;overflow:auto;border:5px solid #80b9eb;border-radius:27px;padding:20px 24px;background:#fff9ed;box-shadow:0 12px 40px #23466844;color:#285578}.timing-kicker{font-size:12px;font-weight:750;letter-spacing:.06em;color:#6e8b9e}.timing-comparison h2{margin:5px 32px 8px 0;font-size:23px;font-weight:850;line-height:1.5}.timing-condition{margin:0 0 10px;padding:7px 11px;background:#eaf5f2;border:1px solid #bfd9ce;border-radius:11px;font-size:14px;color:#507c69}.timing-condition>span{color:#66a389;font-size:22px;vertical-align:middle;margin-right:5px}.timing-flow-pair{display:grid;grid-template-columns:1fr 1fr;gap:15px}.timing-flow-card{border:2px solid #b2cfe5;border-radius:18px;background:#f4fbff;padding:8px 10px}.timing-flow-card.selected{border-color:#df9e3c;background:#fff6df}.timing-predict{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;min-height:42px;border:1px solid #9fc3dd;border-radius:12px;background:#e5f2fc;color:#315d82;font-size:14px;font-weight:750}.selected .timing-predict{background:#ffe4ab;border-color:#dfaa52}.timing-flow{display:block;width:100%;height:min(38vh,310px)}.timing-node rect{fill:#d5ecfb;stroke:#6b9fc6;stroke-width:2}.timing-node.decision path{fill:#e2f0f9;stroke:#6b9fc6;stroke-width:2}.timing-node text{text-anchor:middle;fill:#285778;font-size:15px;font-weight:700}.timing-node.active rect,.timing-node.active path{fill:#ffe1a1;stroke:#e79524;stroke-width:3.5}.timing-arrows path{fill:none;stroke:#4887b6;stroke-width:2.5;stroke-linejoin:round}.timing-branch-word{font-size:14px;fill:#5483a4}.timing-counter{text-align:center;font-size:14px;color:#5c7d94}.timing-counter b{color:#b27221;font-size:23px;font-variant-numeric:tabular-nums;margin:0 5px}.timing-feedback{min-height:44px;margin:10px 0;padding:8px 11px;border-radius:12px;background:#edf5fb;color:#426c8a;font-size:14px;font-weight:650;line-height:1.6}.timing-controls{display:flex;align-items:center;justify-content:space-between;gap:10px}.timing-controls>div{display:flex;gap:6px}.timing-controls .run-button{font-size:17px;min-height:46px;min-width:135px}
 @media(max-height:740px){.timing-comparison{padding:14px 19px}.timing-comparison h2{font-size:21px}.timing-flow{height:34vh}.timing-condition{padding:4px 9px;margin-bottom:7px}.timing-feedback{min-height:38px;padding:6px 9px;margin:7px 0;font-size:13px}}
 @media(max-width:650px){.timing-comparison{padding:16px 12px}.timing-comparison h2{font-size:18px}.timing-flow-pair{gap:7px}.timing-flow-card{padding:7px 4px}.timing-predict{font-size:11px;min-height:44px}.timing-flow{height:250px}.timing-condition{font-size:12px}.timing-feedback{font-size:13px}.timing-prediction-summary{font-size:11px;padding:4px}.timing-controls .run-button{font-size:14px;min-width:115px}}
+
+/* 通关按钮强化：站点跑通后必须由学生主动点这个按钮才会把进度写入服务端，
+   所以它在通过后要足够醒目——光环脉冲 + 放大 + 高对比绿，避免学生做完就离开。 */
+@keyframes completePulse {
+  0%   { box-shadow: inset 0 2px 0 #e9ffef, 0 5px 0 #216b4466, 0 0 0 0 rgba(56, 180, 110, .55); }
+  70%  { box-shadow: inset 0 2px 0 #e9ffef, 0 5px 0 #216b4466, 0 0 0 14px rgba(56, 180, 110, 0); }
+  100% { box-shadow: inset 0 2px 0 #e9ffef, 0 5px 0 #216b4466, 0 0 0 0 rgba(56, 180, 110, 0); }
+}
+.station-controls .complete-button,
+.station-controls .complete-button:disabled {
+  min-width: 215px;
+  min-height: 56px;
+  font-size: 21px !important;
+  font-weight: 850;
+  letter-spacing: .06em;
+  background: linear-gradient(#83e8a6, #2f9f64);
+  border: 3px solid #1d7a4b;
+  color: #fff;
+  text-shadow: 0 1px 0 #14603a;
+  animation: completePulse 1.7s ease-out infinite;
+}
+.complete-button:not(:disabled):hover { transform: translateY(-2px); }
+.complete-button:not(:disabled):active { transform: translateY(2px); }
+.has-guide.guide-complete .complete-button { outline-offset: 4px; }
+@media (max-width: 1000px) {
+  .station-controls .complete-button { min-width: 168px; min-height: 50px; font-size: 18px !important; }
+}
