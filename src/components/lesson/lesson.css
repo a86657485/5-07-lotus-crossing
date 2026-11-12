@@ -79,3 +79,29 @@
 @media (max-width: 1000px) {
   .station-controls .complete-button { min-width: 168px; min-height: 50px; font-size: 18px !important; }
 }
+
+/* ===== 关卡进度条：把「还差几步」显性化 ===== */
+.station-progress { display: flex; align-items: center; gap: 6px; margin-left: auto; padding-left: 14px; border-left: 1px solid #cfe2ef; flex-shrink: 0; }
+.station-progress ol { display: flex; align-items: center; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.station-progress li { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #93aec1; white-space: nowrap; }
+.station-progress li i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #e2eef6; color: #7b98ad; font-style: normal; font-size: 10px; font-weight: 800; line-height: 1; }
+.station-progress li.is-done i { background: #3fae6f; color: #fff; }
+.station-progress li.is-next { color: #a86a1a; }
+.station-progress li.is-next i { background: #ffd383; color: #7c520f; box-shadow: 0 0 0 3px #ffc45f4d; }
+.station-progress > b { font-size: 12px; font-weight: 800; color: #456c8e; font-variant-numeric: tabular-nums; }
+.station-progress li > span { display: none; }
+@media (min-width: 1500px) { .station-progress li.is-next > span { display: inline; } }
+@media (max-width: 760px) { .station-progress { display: none; } }
+
+/* ===== 完成提示浮层：做对一步，立刻说明下一步做什么 ===== */
+.station-tip { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 70; display: flex; align-items: center; gap: 10px; max-width: min(820px, 94%); padding: 10px 14px; border-radius: 16px; background: #fff8e9; border: 3px solid #f0b45e; box-shadow: 0 10px 26px #8a5c1e33; color: #7a4f14; font-size: 14px; font-weight: 750; line-height: 1.45; animation: tipIn .26s ease-out; }
+@keyframes tipIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+.station-tip > span { flex: 1; }
+.station-tip .tip-action { border: 2px solid #d79a3c; background: #ffe1a6; color: #7a4f14; border-radius: 11px; padding: 5px 12px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.station-tip .tip-action:hover { background: #ffd68a; }
+.station-tip .tip-close { border: 0; background: transparent; color: #a87c40; font-size: 19px; line-height: 1; padding: 0 2px; }
+@media (max-height: 740px) { .station-tip { top: 8px; font-size: 13px; padding: 8px 12px; } }
+
+/* ===== 错误聚焦：检查没过时闪一下真正出错的那块 ===== */
+.error-focus { animation: errorPulse 1.35s ease-out 2; border-radius: 18px; }
+@keyframes errorPulse { 0% { box-shadow: 0 0 0 3px #e2604a99; } 60% { box-shadow: 0 0 0 14px #e2604a00; } 100% { box-shadow: 0 0 0 3px #e2604a00; } }

@@ -8,6 +8,7 @@ import MazeTransfer from '../../lesson/MazeTransfer';
 import { restoreStationState, scaffoldFor, trafficUnits } from './stationRestore';
 import TimingComparison, { type TimingComparisonResult } from './TimingComparison';
 import { getStationGuide, type StationKind } from './stationGuidance';
+import { StationProgress, type ProgressStep } from './StationProgress';
 import './lesson.css';
 
 export type { StationKind } from './stationGuidance';
@@ -159,6 +160,33 @@ export default function StationPanel(props: Props) {
   };
 
   const updatePlan = (next: CrossingPlan) => { invalidate(); attemptedPlan.current = ''; scaffoldedPlan.current = ''; setHistory(h => [...h, { ...plan }]); setPlan(next); setCrossingResults({}); setBranch(''); };
+
+  // —— 完成提示浮层：做对一步就明确告诉学生「下一步该做什么」，不依赖他们自己找按钮 ——
+  const [tip, setTip] = useState<{ text: string; actionLabel?: string; onAction?: () => void } | null>(null);
+  const tipTimer = useRef<number | undefined>(undefined);
+  const showTip = (text: string, actionLabel?: string, onAction?: () => void) => {
+    window.clearTimeout(tipTimer.current);
+    setTip({ text, actionLabel, onAction });
+    tipTimer.current = window.setTimeout(() => setTip(null), 10000);
+  };
+  useEffect(() => () => window.clearTimeout(tipTimer.current), []);
+
+  // —— 错误聚焦：点「检查」没过时，把视线和焦点带到真正出错的那一块 ——
+  const focusError = (selector: string, message?: string) => {
+    if (message) setFeedback(message);
+    window.setTimeout(() => {
+      const element = panelRef.current?.querySelector<HTMLElement>(selector);
+      if (!element) return;
+      element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      element.classList.remove('error-focus');
+      void element.offsetWidth;
+      element.classList.add('error-focus');
+      window.setTimeout(() => element.classList.remove('error-focus'), 2800);
+      const focusable = element.querySelector<HTMLElement>('button:not(:disabled), [tabindex]');
+      focusable?.focus({ preventScroll: true });
+    }, 60);
+  };
+
   const undo = () => {
     if (playback.running) return;
     if (props.station === 's1' && history.length) { invalidate(); setPlan(history[history.length - 1]); setHistory(h => h.slice(0, -1)); setCrossingResults({}); setBranch(''); }
@@ -191,7 +219,23 @@ export default function StationPanel(props: Props) {
         const ok = next.green_at_start.correct && next.red_then_green.correct;
         setPassed(ok);
         setFeedback(ok ? '两种情况都验证了。看看哪里在重复、哪里离开。' : '有一种情况未能按任务通过。修改条件或箭头再试。');
-      } else setFeedback('这个情形已运行。换另一种灯色情形试试。');
+        if (ok) {
+          showTip('两种灯色都验证通过了！点右下角「完成引导台」，这一步才会记进课堂大屏。');
+        } else {
+          focusError('.flow-board', '有一种情况没通过：先看菱形里的条件对不对，再看两条箭头分别去哪。');
+        }
+      } else {
+        setFeedback('这个情形已运行。换另一种灯色情形试试。');
+        if (result.correct) {
+          if (next.green_at_start?.correct && !next.red_then_green) {
+            showTip('绿灯情形通过了！接着跑「先红灯，后来变绿」，看循环怎样再走一遍。', '去跑红灯', () => { playback.stop(); setCrossingCase('red_then_green'); });
+          } else if (next.red_then_green?.correct && !next.green_at_start) {
+            showTip('红灯情形通过了！再补跑「到达时已是绿灯」，两种情形都验证才算过。', '去跑绿灯', () => { playback.stop(); setCrossingCase('green_at_start'); });
+          }
+        } else if (result.outcome !== 'crossed_green') {
+          focusError('.flow-board');
+        }
+      }
       const bothTested = !!next.green_at_start && !!next.red_then_green;
       const observableFailure = result.outcome !== 'crossed_green';
       if (!result.correct && scaffoldedPlan.current !== key && (observableFailure || bothTested)) {
@@ -235,19 +279,45 @@ export default function StationPanel(props: Props) {
   const checkComparison = () => {
     if (!comparisonViewed || !edgeChoice || playback.hasNext) return;
     const ok = diagramChoice === 'loop' && edgeChoice === 'back';
-    if (!ok) { emit('attempt', { selectedSide: diagramChoice, edgeId: edgeChoice }, false); registerFailure(); return; }
+    if (!ok) {
+      emit('attempt', { selectedSide: diagramChoice, edgeId: edgeChoice }, false);
+      registerFailure();
+      focusError(diagramChoice !== 'loop' ? '.comparison-stage' : '.comparison-stage', '这次判断还不对：要选带回边的那张图，并点出回到「观察红绿灯」的那条箭头。');
+      return;
+    }
     setPassed(true); setFeedback('你找到了让步骤再做一次的箭头。');
+    showTip('判断正确！点右下角「继续看热水壶」进入下一站。');
   };
   const runKettle = (auto = true) => {
     clearFeedback();
     const trace = simulateKettle(temperature);
-    playback.play(trace, () => { setKettleRuns(old => [...new Set([...old, temperature])]); emit('case_run', { initialTemperature: temperature, trace }); setFeedback(temperature === 100 ? '已经100℃时，先读取判断，没有加热。' : '水温不足时才加热，然后再次读取判断。'); }, auto);
+    playback.play(trace, () => {
+      const runs = [...new Set([...kettleRuns, temperature])];
+      setKettleRuns(runs);
+      emit('case_run', { initialTemperature: temperature, trace });
+      setFeedback(temperature === 100 ? '已经100℃时，先读取判断，没有加热。' : '水温不足时才加热，然后再次读取判断。');
+      if (runs.length === 1) {
+        const other = temperature === 80 ? 100 : 80;
+        showTip(`${temperature}℃ 跑完了。切到「开始时${other}℃」再跑一次，两种水温都要看。`, `切到 ${other}℃`, () => { playback.stop(); setTemperature(other); });
+      } else {
+        showTip('两种水温都跑完了。把三组判断选好，再点「检查我的选择」。');
+      }
+    }, auto);
   };
   const checkKettle = () => {
     const comparison = timingComparisons[timingComparisons.length - 1];
     const ok = ['read', 'heat'].includes(kettleChoices[0]) && kettleChoices[1] === 'at100' && kettleChoices[2] === 'ask' && comparison?.prediction === 'ask';
-    if (!ok) { emit('attempt', { repeatStepId: kettleChoices[0], stopChoice: kettleChoices[1], timingChoice: kettleChoices[2], testedTemperatures: kettleRuns, comparison, comparisonHistory: timingComparisons }, false); registerFailure(); return; }
+    if (!ok) {
+      emit('attempt', { repeatStepId: kettleChoices[0], stopChoice: kettleChoices[1], timingChoice: kettleChoices[2], testedTemperatures: kettleRuns, comparison, comparisonHistory: timingComparisons }, false);
+      registerFailure();
+      const missingChoice = kettleChoices.findIndex((value) => !value);
+      if (missingChoice >= 0) focusError('.kettle-questions', '还有认读项没选：三组都要选，再点「检查我的选择」。');
+      else if (!timingComparisons.length) focusError('.kettle-questions', '还没做先后对照：点「比较：先检查，还是先擦一下？」，先预测再运行。');
+      else focusError('.kettle-questions', '某一项还不对：对照刚才的运行结果，看看哪一步在反复、什么时候停。');
+      return;
+    }
     setPassed(true); setFeedback('你能认出反复步骤、停止条件和判断的先后了。');
+    showTip('判断正确！点右下角「完成拆解台」记录进度。');
   };
   const runTraffic = (auto = true) => {
     const green = baseline ? units : 3;
@@ -261,10 +331,55 @@ export default function StationPanel(props: Props) {
       const entry = { ...result, kind: wasBaseline ? 'baseline' : 'attempt', strategy: `st_${green}`, reason, correct: ok };
       setTrafficHistory(old => [...old, entry]);
       emit('simulation_run', entry, ok);
-      if (wasBaseline) { setBaseline(true); setFeedback('原方案还等9辆。现在选时长和理由，再比较。'); }
-      else { setPassed(ok); if (ok) setFeedback('当前排队减少了，也要顾及其他方向的等待。'); else registerFailure(); }
+      if (wasBaseline) {
+        setBaseline(true);
+        setFeedback('原方案还等9辆。现在选时长和理由，再比较。');
+        showTip('原方案跑完了：行人一侧还等 9 辆。先选车多方向的绿灯时长，再选理由。', '去选时长', () => focusError('.traffic-duration-choices'));
+      } else {
+        setPassed(ok);
+        if (ok) {
+          setFeedback('当前排队减少了，也要顾及其他方向的等待。');
+          showTip('排队减少了！点右下角「完成调度台」记录进度。');
+        } else {
+          registerFailure();
+          focusError(result.remainingCars < 9 ? '.reason-choices' : '.traffic-duration-choices');
+        }
+      }
     }, auto);
   };
+
+  // 最后一格固定是「点确认按钮」本身：只有真正点过才会进入下一站，
+  // 因此它恒为未完成，作为持续指引，避免学生做完探究就以为已上交。
+  const progressSteps: ProgressStep[] = props.station === 's1'
+    ? [
+        { label: '补全流程图', done: !!(plan.condition && plan.yes && plan.no) },
+        { label: '跑绿灯情形', done: !!crossingResults.green_at_start?.correct },
+        { label: '跑红灯情形', done: !!crossingResults.red_then_green?.correct },
+        { label: '点「完成引导台」', done: false },
+      ]
+    : props.station === 's2b'
+      ? [
+          { label: '选一张图', done: !!diagramChoice },
+          { label: '运行看执行', done: comparisonViewed },
+          { label: '点回边箭头', done: !!edgeChoice },
+          { label: '检查判断', done: passed },
+          { label: '点「继续看热水壶」', done: false },
+        ]
+      : props.station === 's2c'
+        ? [
+            { label: '三组判断', done: kettleChoices.every(Boolean) },
+            { label: '先后对照', done: timingComparisons.length > 0 },
+            { label: '跑两个水温', done: kettleRuns.includes(80) && kettleRuns.includes(100) },
+            { label: '检查选择', done: passed },
+            { label: '点「完成拆解台」', done: false },
+          ]
+        : [
+            { label: '运行原方案', done: baseline },
+            { label: '选绿灯时长', done: !!units },
+            { label: '选理由', done: !!reason },
+            { label: '再运行比较', done: passed },
+            { label: '点「完成调度台」', done: false },
+          ];
 
   const ready = props.station === 's1' ? !!(plan.condition && plan.yes && plan.no)
     : props.station === 's2b' ? !!diagramChoice
@@ -342,6 +457,17 @@ export default function StationPanel(props: Props) {
   }, [!!help, learnOpen]);
 
   return <section ref={panelRef} className={`station-panel ${modalOpen ? '' : `has-guide guide-${guide.target}`}`} data-guide-target={modalOpen ? undefined : guide.target} aria-label={`${names[props.station][0]}学习任务`}>
+    {tip && (
+      <div className="station-tip" role="status">
+        <span>{tip.text}</span>
+        {tip.actionLabel && (
+          <button type="button" className="tip-action" onClick={() => { tip.onAction?.(); setTip(null); }}>
+            {tip.actionLabel}
+          </button>
+        )}
+        <button type="button" className="tip-close" aria-label="关闭提示" onClick={() => setTip(null)}>×</button>
+      </div>
+    )}
     <header className="station-heading" inert={modalOpen}>
       <button className="round-tool" disabled={relicBusy} onClick={close} aria-label="返回路口"><ArrowLeft size={22}/></button>
       <div className="station-title"><span>临时小交警 · {names[props.station][0]}</span><h1>{names[props.station][1]}</h1></div>
@@ -349,7 +475,7 @@ export default function StationPanel(props: Props) {
       <button className="help-button" disabled={relicBusy} onClick={() => { pauseForHelp(); setHelp(`${guide.hint} ${guide.location} 撤回不会扣分。`); }}><HelpCircle size={20}/>操作帮助</button>
       <button className="relic-button" disabled={relicBusy || !props.onUseRelic || (props.relicRemaining ?? 3) <= 0} onClick={() => void useRelic()}><Sparkles size={21}/>{relicBusy ? '正在确认次数…' : '通关法宝'} <b>{props.relicRemaining ?? 3}/3</b></button>
     </header>
-    <div className="station-task"><span className="task-dot"/><p aria-live="polite">{guide.hint}</p>{playback.trace.length > 0 && <span className="trace-count">执行 {playback.index + 1}/{playback.trace.length}</span>}</div>
+    <div className="station-task"><span className="task-dot"/><p aria-live="polite">{guide.hint}</p><StationProgress steps={progressSteps}/>{playback.trace.length > 0 && <span className="trace-count">执行 {playback.index + 1}/{playback.trace.length}</span>}</div>
     {relicError && <p className="lesson-relic-error" role="status">{relicError}</p>}
     {props.station === 's2b' ? <div className="comparison-stage" inert={modalOpen}>
       {[{ id: 'loop' as const, label: '方案甲', nodes: crossingNodes('绿灯未亮起？', false), edges: loopEdges }, { id: 'branch' as const, label: '方案乙', nodes: branchNodes, edges: branchEdges }].map(({ id, label, nodes, edges }) => <div className={`comparison-card ${diagramChoice === id ? 'is-selected' : ''}`} key={id}>
