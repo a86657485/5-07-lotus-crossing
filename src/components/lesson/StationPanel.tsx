@@ -162,6 +162,7 @@ export default function StationPanel(props: Props) {
   const updatePlan = (next: CrossingPlan) => { invalidate(); attemptedPlan.current = ''; scaffoldedPlan.current = ''; setHistory(h => [...h, { ...plan }]); setPlan(next); setCrossingResults({}); setBranch(''); };
 
   // —— 完成提示浮层：做对一步就明确告诉学生「下一步该做什么」，不依赖他们自己找按钮 ——
+  const [restartArmed, setRestartArmed] = useState(false);
   const [tip, setTip] = useState<{ text: string; actionLabel?: string; onAction?: () => void } | null>(null);
   const tipTimer = useRef<number | undefined>(undefined);
   const showTip = (text: string, actionLabel?: string, onAction?: () => void) => {
@@ -348,6 +349,44 @@ export default function StationPanel(props: Props) {
     }, auto);
   };
 
+  // 按钮为什么点不了：禁用状态不解释原因，学生只会干等。
+  // 这里把「还差什么」算出来，按钮照样可点，点了就把原因说出来。
+  const blockedReason = (kind: 'run' | 'check'): string | null => {
+    if (props.station === 's1') {
+      if (kind === 'run' && !(plan.condition && plan.yes && plan.no)) return '先把菱形里的条件和两条箭头补好';
+      return null;
+    }
+    if (props.station === 's2b') {
+      if (kind === 'run' && !diagramChoice) return '先选一张流程图';
+      if (kind === 'check') {
+        if (!diagramChoice) return '先选一张流程图';
+        if (!comparisonViewed) return '先点「运行这张图」看一遍执行';
+        if (!edgeChoice) return '先在图上点出那条会回去的箭头';
+      }
+      return null;
+    }
+    if (props.station === 's2c') {
+      if (kind === 'check') {
+        if (kettleChoices.some((value) => !value)) return '三组认读还没选完';
+        if (!timingComparisons.length) return '还没做「先后对照」';
+        if (kettleRuns.length < 2) return '两个水温都要各跑一次';
+      }
+      return null;
+    }
+    if (props.station === 's3' && kind === 'run' && baseline && (!units || !reason)) {
+      return '选好绿灯时长和理由再运行';
+    }
+    return null;
+  };
+  const runBlocked = blockedReason('run');
+  const checkBlocked = blockedReason('check');
+  // 点未就绪的按钮时：说出来 + 把视线带到该去的地方
+  const explainBlocked = (reason: string, selector: string) => {
+    setFeedback(`还差一步：${reason}。`);
+    showTip(`${reason}，再点一次就能继续。`);
+    focusError(selector);
+  };
+
   // 最后一格固定是「点确认按钮」本身：只有真正点过才会进入下一站，
   // 因此它恒为未完成，作为持续指引，避免学生做完探究就以为已上交。
   const progressSteps: ProgressStep[] = props.station === 's1'
@@ -524,16 +563,16 @@ export default function StationPanel(props: Props) {
             <button disabled={!ready || (playback.trace.length > 0 && !playback.hasNext)} onClick={() => playback.trace.length ? playback.advance() : startPlayback(false)}><SkipForward size={19}/>单步</button>
           </div>
           <button disabled={!ready || playback.running || passed} onClick={() => startPlayback()}><RotateCcw size={19}/>重试本次</button>
-          <button disabled={!props.onRestart || relicBusy} onClick={() => { playback.stop(); props.onRestart?.(); }}><RotateCcw size={19}/>重做本关</button>
+          <button disabled={!props.onRestart || relicBusy} className={restartArmed ? 'restart-armed' : undefined} onClick={() => { if (!restartArmed) { setRestartArmed(true); setFeedback('再点一次「确认重做」会清空本关进度。'); window.setTimeout(() => setRestartArmed(false), 4000); return; } setRestartArmed(false); playback.stop(); props.onRestart?.(); }}><RotateCcw size={19}/>{restartArmed ? '确认重做？' : '重做本关'}</button>
         </div>
         <div className="primary-controls">
           {props.station === 's2c' && passed && <button className="check-button" disabled={relicBusy} onClick={() => { playback.stop(); setMazeOpen(true); }}>选做：巡检小车</button>}
           {props.station === 's2b' && !passed && <>
-            {!comparisonViewed && <button className="run-button simulate-button" disabled={!diagramChoice || playback.hasNext} onClick={() => startPlayback()}>运行这张图<Play size={20}/></button>}
-            <button className="run-button verify-button" disabled={!diagramChoice || !edgeChoice || !comparisonViewed || playback.hasNext} onClick={checkComparison}>检查我的判断<ChevronRight size={20}/></button>
+            {!comparisonViewed && <button className={`run-button simulate-button ${runBlocked ? 'is-blocked' : ''}`} aria-disabled={!!runBlocked || playback.hasNext} onClick={() => { if (runBlocked) { explainBlocked(runBlocked, '.comparison-stage'); return; } startPlayback(); }}>运行这张图<Play size={20}/></button>}
+            <button className={`run-button verify-button ${checkBlocked ? 'is-blocked' : ''}`} aria-disabled={!!checkBlocked || playback.hasNext} onClick={() => { if (playback.hasNext) { setFeedback('先把这次执行看完，再检查判断。'); return; } if (checkBlocked) { explainBlocked(checkBlocked, '.comparison-stage'); return; } checkComparison(); }}>检查我的判断<ChevronRight size={20}/></button>
           </>}
-          {props.station === 's2c' && !passed && <button className="check-button verify-button" disabled={kettleChoices.some(v => !v) || kettleRuns.length < 2 || !timingComparisons.length || playback.hasNext} onClick={checkKettle}>检查我的选择<Check size={20}/></button>}
-          {props.station !== 's2b' && !passed && <button className="run-button simulate-button" disabled={!ready || playback.running} onClick={() => startPlayback()}><Play size={22} fill="currentColor"/>{props.station === 's3' && !baseline ? '运行原方案' : props.station === 's2c' ? `运行 ${temperature}℃` : '运行'}</button>}
+          {props.station === 's2c' && !passed && <button className={`check-button verify-button ${checkBlocked ? 'is-blocked' : ''}`} aria-disabled={!!checkBlocked || playback.hasNext} onClick={() => { if (playback.hasNext) { setFeedback('先把这次执行看完，再检查选择。'); return; } if (checkBlocked) { explainBlocked(checkBlocked, '.kettle-questions'); return; } checkKettle(); }}>检查我的选择<Check size={20}/></button>}
+          {props.station !== 's2b' && !passed && <button className={`run-button simulate-button ${runBlocked ? 'is-blocked' : ''}`} aria-disabled={!!runBlocked || playback.running} onClick={() => { if (playback.running) return; if (runBlocked) { explainBlocked(runBlocked, props.station === 's3' ? '.traffic-choices' : '.flow-board'); return; } startPlayback(); }}><Play size={22} fill="currentColor"/>{props.station === 's3' && !baseline ? '运行原方案' : props.station === 's2c' ? `运行 ${temperature}℃` : '运行'}</button>}
           {passed && <button className="run-button complete-button" disabled={relicBusy} onClick={mainAction}>{mainText}<ChevronRight size={24}/></button>}
         </div>
       </div>

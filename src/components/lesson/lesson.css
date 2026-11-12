@@ -105,3 +105,8 @@
 /* ===== 错误聚焦：检查没过时闪一下真正出错的那块 ===== */
 .error-focus { animation: errorPulse 1.35s ease-out 2; border-radius: 18px; }
 @keyframes errorPulse { 0% { box-shadow: 0 0 0 3px #e2604a99; } 60% { box-shadow: 0 0 0 14px #e2604a00; } 100% { box-shadow: 0 0 0 3px #e2604a00; } }
+
+/* 未就绪的按钮仍可点：点了会说明「还差什么」，而不是静静地灰着 */
+.run-button.is-blocked, .check-button.is-blocked { opacity: .58; filter: grayscale(.3); }
+.run-button.is-blocked:hover, .check-button.is-blocked:hover { opacity: .72; }
+.secondary-controls button.restart-armed { background: #ffe3c2; border-color: #e08c2e; color: #8a4a10; animation: errorPulse 1.2s ease-out 2; }
