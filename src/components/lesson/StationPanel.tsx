@@ -190,10 +190,10 @@ export default function StationPanel(props: Props) {
 
   const undo = () => {
     if (playback.running) return;
-    if (props.station === 's1' && history.length) { invalidate(); setPlan(history[history.length - 1]); setHistory(h => h.slice(0, -1)); setCrossingResults({}); setBranch(''); }
-    else if (props.station === 's2b' && comparisonHistory.length) { invalidate(); const previous = comparisonHistory[comparisonHistory.length - 1]; setDiagramChoice(previous.diagramChoice); setEdgeChoice(previous.edgeChoice); setComparisonViewed(previous.comparisonViewed); setComparisonHistory(old => old.slice(0, -1)); }
-    else if (props.station === 's2c' && kettleHistory.length) { invalidate(); const previous = kettleHistory[kettleHistory.length - 1]; setKettleChoices(previous.choices); setKettleStage(previous.stage); setKettleHistory(old => old.slice(0, -1)); }
-    else if (props.station === 's3' && trafficEdits.length) { invalidate(); const previous = trafficEdits[trafficEdits.length - 1]; setUnits(previous.units); setReason(previous.reason); setTrafficEdits(old => old.slice(0, -1)); }
+    if (props.station === 's1' && history.length) { invalidate(); setPlan(history[history.length - 1]); setHistory(h => h.slice(0, -1)); setCrossingResults({}); setBranch(''); setFeedback('已撤回一步：回到上一次的条件与连线，可以重新连。'); }
+    else if (props.station === 's2b' && comparisonHistory.length) { invalidate(); const previous = comparisonHistory[comparisonHistory.length - 1]; setDiagramChoice(previous.diagramChoice); setEdgeChoice(previous.edgeChoice); setComparisonViewed(previous.comparisonViewed); setComparisonHistory(old => old.slice(0, -1)); setFeedback('已撤回一步：回到上一次选的图和箭头。'); }
+    else if (props.station === 's2c' && kettleHistory.length) { invalidate(); const previous = kettleHistory[kettleHistory.length - 1]; setKettleChoices(previous.choices); setKettleStage(previous.stage); setKettleHistory(old => old.slice(0, -1)); setFeedback('已撤回一步：回到上一组认读选项。'); }
+    else if (props.station === 's3' && trafficEdits.length) { invalidate(); const previous = trafficEdits[trafficEdits.length - 1]; setUnits(previous.units); setReason(previous.reason); setTrafficEdits(old => old.slice(0, -1)); setFeedback('已撤回一步：回到上一次的时长与理由。'); }
   };
   useEffect(() => {
     const handler = (event: KeyboardEvent) => { if (help || learnOpen || mazeOpen || timingOpen) return; if (event.key === 'Backspace' && !['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement)?.tagName)) { event.preventDefault(); undo(); } };
@@ -221,7 +221,7 @@ export default function StationPanel(props: Props) {
         setPassed(ok);
         setFeedback(ok ? '两种情况都验证了。看看哪里在重复、哪里离开。' : '有一种情况未能按任务通过。修改条件或箭头再试。');
         if (ok) {
-          showTip('两种灯色都验证通过了！点右下角「完成引导台」，这一步才会记进课堂大屏。');
+          showTip('两种灯色都验证通过了！判断框答「是」就回到观察，这就是循环；答「否」才去过马路。点右下角「完成引导台」记录进度。');
         } else {
           focusError('.flow-board', '有一种情况没通过：先看菱形里的条件对不对，再看两条箭头分别去哪。');
         }
@@ -286,7 +286,7 @@ export default function StationPanel(props: Props) {
       focusError(diagramChoice !== 'loop' ? '.comparison-stage' : '.comparison-stage', '这次判断还不对：要选带回边的那张图，并点出回到「观察红绿灯」的那条箭头。');
       return;
     }
-    setPassed(true); setFeedback('你找到了让步骤再做一次的箭头。');
+    setPassed(true); setFeedback('你找到了让步骤再做一次的箭头——这条往回指的线就是循环的回边。');
     showTip('判断正确！点右下角「继续看热水壶」进入下一站。');
   };
   const runKettle = (auto = true) => {
@@ -317,7 +317,7 @@ export default function StationPanel(props: Props) {
       else focusError('.kettle-questions', '某一项还不对：对照刚才的运行结果，看看哪一步在反复、什么时候停。');
       return;
     }
-    setPassed(true); setFeedback('你能认出反复步骤、停止条件和判断的先后了。');
+    setPassed(true); setFeedback('你能认出反复步骤、停止条件和判断的先后了：读取水温是判断，加热是重复做的部分，到 100℃ 就停。');
     showTip('判断正确！点右下角「完成拆解台」记录进度。');
   };
   const runTraffic = (auto = true) => {
@@ -339,7 +339,7 @@ export default function StationPanel(props: Props) {
       } else {
         setPassed(ok);
         if (ok) {
-          setFeedback('当前排队减少了，也要顾及其他方向的等待。');
+          setFeedback('当前排队减少了，另一侧等待变长——给一侧更多绿灯，是用另一侧的时间换来的。');
           showTip('排队减少了！点右下角「完成调度台」记录进度。');
         } else {
           registerFailure();
@@ -512,7 +512,7 @@ export default function StationPanel(props: Props) {
       <div className="station-title"><span>临时小交警 · {names[props.station][0]}</span><h1>{names[props.station][1]}</h1></div>
       <button className="help-button learn-button" disabled={relicBusy} onClick={() => { pauseForHelp(); setLearnOpen(true); }}><BookOpen size={20}/>先学卡</button>
       <button className="help-button" disabled={relicBusy} onClick={() => { pauseForHelp(); setHelp(`${guide.hint} ${guide.location} 撤回不会扣分。`); }}><HelpCircle size={20}/>操作帮助</button>
-      <button className="relic-button" disabled={relicBusy || !props.onUseRelic || (props.relicRemaining ?? 3) <= 0} onClick={() => void useRelic()}><Sparkles size={21}/>{relicBusy ? '正在确认次数…' : '通关法宝'} <b>{props.relicRemaining ?? 3}/3</b></button>
+      <button className="relic-button" disabled={relicBusy || !props.onUseRelic} onClick={() => { if ((props.relicRemaining ?? 3) <= 0) { setFeedback('本课 3 次通关法宝已经用完。法宝只是指路，不是答案，靠自己也能通过。'); showTip('法宝次数用完了。回想刚才的运行轨迹，再试一次。'); return; } void useRelic(); }}><Sparkles size={21}/>{relicBusy ? '正在确认次数…' : (props.relicRemaining ?? 3) <= 0 ? '法宝已用完' : '通关法宝'} <b>{props.relicRemaining ?? 3}/3</b></button>
     </header>
     <div className="station-task"><span className="task-dot"/><p aria-live="polite">{guide.hint}</p><StationProgress steps={progressSteps}/>{playback.trace.length > 0 && <span className="trace-count">执行 {playback.index + 1}/{playback.trace.length}</span>}</div>
     {relicError && <p className="lesson-relic-error" role="status">{relicError}</p>}
@@ -572,7 +572,7 @@ export default function StationPanel(props: Props) {
             <button className={`run-button verify-button ${checkBlocked ? 'is-blocked' : ''}`} aria-disabled={!!checkBlocked || playback.hasNext} onClick={() => { if (playback.hasNext) { setFeedback('先把这次执行看完，再检查判断。'); return; } if (checkBlocked) { explainBlocked(checkBlocked, '.comparison-stage'); return; } checkComparison(); }}>检查我的判断<ChevronRight size={20}/></button>
           </>}
           {props.station === 's2c' && !passed && <button className={`check-button verify-button ${checkBlocked ? 'is-blocked' : ''}`} aria-disabled={!!checkBlocked || playback.hasNext} onClick={() => { if (playback.hasNext) { setFeedback('先把这次执行看完，再检查选择。'); return; } if (checkBlocked) { explainBlocked(checkBlocked, '.kettle-questions'); return; } checkKettle(); }}>检查我的选择<Check size={20}/></button>}
-          {props.station !== 's2b' && !passed && <button className={`run-button simulate-button ${runBlocked ? 'is-blocked' : ''}`} aria-disabled={!!runBlocked || playback.running} onClick={() => { if (playback.running) return; if (runBlocked) { explainBlocked(runBlocked, props.station === 's3' ? '.traffic-choices' : '.flow-board'); return; } startPlayback(); }}><Play size={22} fill="currentColor"/>{props.station === 's3' && !baseline ? '运行原方案' : props.station === 's2c' ? `运行 ${temperature}℃` : '运行'}</button>}
+          {props.station !== 's2b' && !passed && <button className={`run-button simulate-button ${runBlocked ? 'is-blocked' : ''}`} aria-disabled={!!runBlocked || playback.running} onClick={() => { if (playback.running) return; if (runBlocked) { explainBlocked(runBlocked, props.station === 's3' ? '.traffic-choices' : '.flow-board'); return; } startPlayback(); }}><Play size={22} fill="currentColor"/>{playback.running ? '正在运行…' : props.station === 's3' && !baseline ? '运行原方案' : props.station === 's2c' ? `运行 ${temperature}℃` : '运行'}</button>}
           {passed && <button className="run-button complete-button" disabled={relicBusy} onClick={mainAction}>{mainText}<ChevronRight size={24}/></button>}
         </div>
       </div>

@@ -317,8 +317,10 @@ export default function App() {
   return (
     <div className="w-full min-h-screen bg-slate-950">
       {syncError && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-900 text-xs px-3 py-1.5 rounded-lg shadow z-50">
-          {syncError}
+        <div className="fixed top-2 left-1/2 z-[9999] flex items-center gap-2 -translate-x-1/2 rounded-xl bg-amber-400 px-4 py-2 text-sm font-bold text-slate-900 shadow-2xl">
+          <span aria-hidden="true">⚠</span>
+          <span>{syncError}</span>
+          <span className="font-normal">—— 作答已暂存在本机，恢复后会自动补传，不必重做</span>
         </div>
       )}
 

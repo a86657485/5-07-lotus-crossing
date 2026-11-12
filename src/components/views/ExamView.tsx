@@ -268,7 +268,12 @@ export const ExamView: React.FC<ExamViewProps> = ({
         <div className="exam-frame">
           <header className="exam-header">
             <div className="exam-header-left">
-              <button type="button" onClick={onBackToMap} className={navStyle}>← 返回路口</button>
+              <button type="button" onClick={() => {
+                const answeredCount = currentQuestions.filter(q => isQuestionComplete(q, answers[q.id])).length;
+                const left = currentQuestions.length - answeredCount;
+                if (!baseComplete && answeredCount > 0 && !window.confirm(`还有 ${left} 题没答完。现在离开，这次作答不会保存。确定离开？`)) return;
+                onBackToMap();
+              }} className={navStyle}>← 返回路口</button>
               <h1>临时小交警 · 课堂综合检测</h1>
             </div>
             <div className="exam-header-tiers">

@@ -110,3 +110,7 @@
 .run-button.is-blocked, .check-button.is-blocked { opacity: .58; filter: grayscale(.3); }
 .run-button.is-blocked:hover, .check-button.is-blocked:hover { opacity: .72; }
 .secondary-controls button.restart-armed { background: #ffe3c2; border-color: #e08c2e; color: #8a4a10; animation: errorPulse 1.2s ease-out 2; }
+
+/* 运行中：按钮明确表达「正在运行」，避免学生反复点 */
+.run-button[aria-disabled="true"]:not(.is-blocked) { opacity: .8; cursor: progress; }
+.relic-button:disabled { opacity: .5; }
