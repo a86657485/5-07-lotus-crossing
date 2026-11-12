@@ -1,0 +1,829 @@
+{
+  "startedAtShanghai": "2026-11-10T14:36:37+08:00 Asia/Shanghai",
+  "base": "http://192.168.0.14:18997",
+  "commit": "2f19b86-uncommitted",
+  "dataDir": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/tmp-data",
+  "checks": [
+    {
+      "name": "login",
+      "passed": true,
+      "detail": "manual-3844820b3ff1f8e3dcdf75fc"
+    },
+    {
+      "name": "map-visible",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "s1-station-fill",
+      "passed": true,
+      "detail": "{\"workspaceH\":556,\"gapBelowBottom\":18,\"panelH\":900}"
+    },
+    {
+      "name": "unlock-exam-via-api",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "exam-open",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "layout-B01-1440x900",
+      "passed": true,
+      "detail": "{\"q\":\"B01\",\"type\":\"recall\",\"fill\":0.791,\"visualH\":696,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":292,\"figureClips\":[],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s1_queue.png\",\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-B01-1366x768",
+      "passed": true,
+      "detail": "{\"q\":\"B01\",\"type\":\"recall\",\"fill\":0.766,\"visualH\":572,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":255,\"figureClips\":[],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s1_queue.png\",\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-B08-1440x900",
+      "passed": true,
+      "detail": "{\"q\":\"B08\",\"type\":\"figure\",\"fill\":0.791,\"visualH\":696,\"canvasH\":633,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":305,\"figureClips\":[{\"name\":\"B08-a\",\"clips\":[]},{\"name\":\"B08-b\",\"clips\":[]}],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-B08-1366x768",
+      "passed": true,
+      "detail": "{\"q\":\"B08\",\"type\":\"figure\",\"fill\":0.766,\"visualH\":572,\"canvasH\":509,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":255,\"figureClips\":[{\"name\":\"B08-a\",\"clips\":[]},{\"name\":\"B08-b\",\"clips\":[]}],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "submit-base-for-challenge",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "challenge-unlocked",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "layout-C01-1440x900",
+      "passed": true,
+      "detail": "{\"q\":\"C01\",\"type\":\"figure\",\"fill\":0.72,\"visualH\":632,\"canvasH\":606,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":273,\"figureClips\":[{\"name\":\"C01\",\"clips\":[]}],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-C01-1366x768",
+      "passed": true,
+      "detail": "{\"q\":\"C01\",\"type\":\"figure\",\"fill\":0.688,\"visualH\":512,\"canvasH\":486,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":225,\"figureClips\":[{\"name\":\"C01\",\"clips\":[]}],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-C02-1440x900",
+      "passed": true,
+      "detail": "{\"q\":\"C02\",\"type\":\"figure\",\"fill\":0.72,\"visualH\":632,\"canvasH\":569,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":273,\"figureClips\":[{\"name\":\"C02-a\",\"clips\":[]},{\"name\":\"C02-b\",\"clips\":[]}],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-C02-1366x768",
+      "passed": true,
+      "detail": "{\"q\":\"C02\",\"type\":\"figure\",\"fill\":0.688,\"visualH\":512,\"canvasH\":449,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":225,\"figureClips\":[{\"name\":\"C02-a\",\"clips\":[]},{\"name\":\"C02-b\",\"clips\":[]}],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":null,\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-C03-1440x900",
+      "passed": true,
+      "detail": "{\"q\":\"C03\",\"type\":\"recall\",\"fill\":0.72,\"visualH\":632,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":273,\"figureClips\":[],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s3_booth.png\",\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-C03-1366x768",
+      "passed": true,
+      "detail": "{\"q\":\"C03\",\"type\":\"recall\",\"fill\":0.688,\"visualH\":512,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":225,\"figureClips\":[],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_s3_booth.png\",\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-C05-1440x900",
+      "passed": true,
+      "detail": "{\"q\":\"C05\",\"type\":\"recall\",\"fill\":0.72,\"visualH\":632,\"canvasH\":null,\"gapBelowFooter\":19,\"promptScroll\":0,\"gapBelowOptions\":6,\"optionMinHeight\":55,\"figureClips\":[],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_exam_ready.png\",\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "layout-C05-1366x768",
+      "passed": true,
+      "detail": "{\"q\":\"C05\",\"type\":\"recall\",\"fill\":0.688,\"visualH\":512,\"canvasH\":null,\"gapBelowFooter\":15,\"promptScroll\":0,\"gapBelowOptions\":2,\"optionMinHeight\":40,\"figureClips\":[],\"overflowY\":0,\"unselectedYellow\":[],\"recallSrc\":\"/lesson/story/cg_exam_ready.png\",\"stemInView\":true,\"footerInView\":true}"
+    },
+    {
+      "name": "pageErrors-empty",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "failures": [],
+  "pageErrors": [],
+  "shots": [
+    {
+      "file": "after-login-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-login-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-login-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-login-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-map-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-map-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-map-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-map-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-s1-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-s1-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-s1-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-s1-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-B01-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-B01-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-B01-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-B01-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-B08-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-B08-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-B08-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-B08-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-C01-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C01-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-C01-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C01-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-C02-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C02-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-C02-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C02-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-C03-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C03-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-C03-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C03-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "file": "after-C05-1440x900.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C05-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "after-C05-1366x768.png",
+      "dest": "/Users/jun/Desktop/2026-2027教学备课/.worktrees/g5l7-train-reward/docs/verification/layout-20261110/after-C05-1366x768.png",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "label": "s1-station",
+      "workspaceH": 556,
+      "gapBelowBottom": 18,
+      "panelH": 900
+    },
+    {
+      "vw": 1440,
+      "vh": 900,
+      "question": "B01",
+      "visualType": "recall",
+      "shellH": 900,
+      "workspaceH": 712,
+      "visual": {
+        "top": 130,
+        "right": 768.46875,
+        "bottom": 826,
+        "left": 33,
+        "width": 735.46875,
+        "height": 696
+      },
+      "prompt": {
+        "top": 130,
+        "right": 1407,
+        "bottom": 826,
+        "left": 780.46875,
+        "width": 626.53125,
+        "height": 696
+      },
+      "canvasH": null,
+      "canvasW": null,
+      "recallLoaded": true,
+      "recallSrc": "/lesson/story/cg_s1_queue.png",
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 19,
+      "workspaceFillRatio": 0.791,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 292,
+      "figureClips": [],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "B01-1440x900",
+      "at": "2026-11-10T14:36:45+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1366,
+      "vh": 768,
+      "question": "B01",
+      "visualType": "recall",
+      "shellH": 768,
+      "workspaceH": 588,
+      "visual": {
+        "top": 126,
+        "right": 729.46875,
+        "bottom": 698,
+        "left": 21,
+        "width": 708.46875,
+        "height": 572
+      },
+      "prompt": {
+        "top": 126,
+        "right": 1345,
+        "bottom": 698,
+        "left": 741.46875,
+        "width": 603.53125,
+        "height": 572
+      },
+      "canvasH": null,
+      "canvasW": null,
+      "recallLoaded": true,
+      "recallSrc": "/lesson/story/cg_s1_queue.png",
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 15,
+      "workspaceFillRatio": 0.766,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 255,
+      "figureClips": [],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "B01-1366x768",
+      "at": "2026-11-10T14:36:45+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1440,
+      "vh": 900,
+      "question": "B08",
+      "visualType": "figure",
+      "shellH": 900,
+      "workspaceH": 712,
+      "visual": {
+        "top": 130,
+        "right": 768.46875,
+        "bottom": 826,
+        "left": 33,
+        "width": 735.46875,
+        "height": 696
+      },
+      "prompt": {
+        "top": 130,
+        "right": 1407,
+        "bottom": 826,
+        "left": 780.46875,
+        "width": 626.53125,
+        "height": 696
+      },
+      "canvasH": 633,
+      "canvasW": 333,
+      "recallLoaded": null,
+      "recallSrc": null,
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 19,
+      "workspaceFillRatio": 0.791,
+      "optionCount": 2,
+      "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 305,
+      "figureClips": [
+        {
+          "name": "B08-a",
+          "clips": []
+        },
+        {
+          "name": "B08-b",
+          "clips": []
+        }
+      ],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "B08-1440x900",
+      "at": "2026-11-10T14:36:47+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1366,
+      "vh": 768,
+      "question": "B08",
+      "visualType": "figure",
+      "shellH": 768,
+      "workspaceH": 588,
+      "visual": {
+        "top": 126,
+        "right": 729.46875,
+        "bottom": 698,
+        "left": 21,
+        "width": 708.46875,
+        "height": 572
+      },
+      "prompt": {
+        "top": 126,
+        "right": 1345,
+        "bottom": 698,
+        "left": 741.46875,
+        "width": 603.53125,
+        "height": 572
+      },
+      "canvasH": 509,
+      "canvasW": 319,
+      "recallLoaded": null,
+      "recallSrc": null,
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 15,
+      "workspaceFillRatio": 0.766,
+      "optionCount": 2,
+      "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 255,
+      "figureClips": [
+        {
+          "name": "B08-a",
+          "clips": []
+        },
+        {
+          "name": "B08-b",
+          "clips": []
+        }
+      ],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "B08-1366x768",
+      "at": "2026-11-10T14:36:48+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1440,
+      "vh": 900,
+      "question": "C01",
+      "visualType": "figure",
+      "shellH": 900,
+      "workspaceH": 648,
+      "visual": {
+        "top": 194,
+        "right": 768.46875,
+        "bottom": 826,
+        "left": 33,
+        "width": 735.46875,
+        "height": 632
+      },
+      "prompt": {
+        "top": 194,
+        "right": 1407,
+        "bottom": 826,
+        "left": 780.46875,
+        "width": 626.53125,
+        "height": 632
+      },
+      "canvasH": 606,
+      "canvasW": 705,
+      "recallLoaded": null,
+      "recallSrc": null,
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 19,
+      "workspaceFillRatio": 0.72,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 273,
+      "figureClips": [
+        {
+          "name": "C01",
+          "clips": []
+        }
+      ],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C01-1440x900",
+      "at": "2026-11-10T14:36:49+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1366,
+      "vh": 768,
+      "question": "C01",
+      "visualType": "figure",
+      "shellH": 768,
+      "workspaceH": 528,
+      "visual": {
+        "top": 186,
+        "right": 729.46875,
+        "bottom": 698,
+        "left": 21,
+        "width": 708.46875,
+        "height": 512
+      },
+      "prompt": {
+        "top": 186,
+        "right": 1345,
+        "bottom": 698,
+        "left": 741.46875,
+        "width": 603.53125,
+        "height": 512
+      },
+      "canvasH": 486,
+      "canvasW": 678,
+      "recallLoaded": null,
+      "recallSrc": null,
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 15,
+      "workspaceFillRatio": 0.688,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 225,
+      "figureClips": [
+        {
+          "name": "C01",
+          "clips": []
+        }
+      ],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C01-1366x768",
+      "at": "2026-11-10T14:36:50+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1440,
+      "vh": 900,
+      "question": "C02",
+      "visualType": "figure",
+      "shellH": 900,
+      "workspaceH": 648,
+      "visual": {
+        "top": 194,
+        "right": 768.46875,
+        "bottom": 826,
+        "left": 33,
+        "width": 735.46875,
+        "height": 632
+      },
+      "prompt": {
+        "top": 194,
+        "right": 1407,
+        "bottom": 826,
+        "left": 780.46875,
+        "width": 626.53125,
+        "height": 632
+      },
+      "canvasH": 569,
+      "canvasW": 333,
+      "recallLoaded": null,
+      "recallSrc": null,
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 19,
+      "workspaceFillRatio": 0.72,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 273,
+      "figureClips": [
+        {
+          "name": "C02-a",
+          "clips": []
+        },
+        {
+          "name": "C02-b",
+          "clips": []
+        }
+      ],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C02-1440x900",
+      "at": "2026-11-10T14:36:51+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1366,
+      "vh": 768,
+      "question": "C02",
+      "visualType": "figure",
+      "shellH": 768,
+      "workspaceH": 528,
+      "visual": {
+        "top": 186,
+        "right": 729.46875,
+        "bottom": 698,
+        "left": 21,
+        "width": 708.46875,
+        "height": 512
+      },
+      "prompt": {
+        "top": 186,
+        "right": 1345,
+        "bottom": 698,
+        "left": 741.46875,
+        "width": 603.53125,
+        "height": 512
+      },
+      "canvasH": 449,
+      "canvasW": 319,
+      "recallLoaded": null,
+      "recallSrc": null,
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 15,
+      "workspaceFillRatio": 0.688,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 225,
+      "figureClips": [
+        {
+          "name": "C02-a",
+          "clips": []
+        },
+        {
+          "name": "C02-b",
+          "clips": []
+        }
+      ],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C02-1366x768",
+      "at": "2026-11-10T14:36:52+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1440,
+      "vh": 900,
+      "question": "C03",
+      "visualType": "recall",
+      "shellH": 900,
+      "workspaceH": 648,
+      "visual": {
+        "top": 194,
+        "right": 768.46875,
+        "bottom": 826,
+        "left": 33,
+        "width": 735.46875,
+        "height": 632
+      },
+      "prompt": {
+        "top": 194,
+        "right": 1407,
+        "bottom": 826,
+        "left": 780.46875,
+        "width": 626.53125,
+        "height": 632
+      },
+      "canvasH": null,
+      "canvasW": null,
+      "recallLoaded": true,
+      "recallSrc": "/lesson/story/cg_s3_booth.png",
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 19,
+      "workspaceFillRatio": 0.72,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 273,
+      "figureClips": [],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C03-1440x900",
+      "at": "2026-11-10T14:36:52+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1366,
+      "vh": 768,
+      "question": "C03",
+      "visualType": "recall",
+      "shellH": 768,
+      "workspaceH": 528,
+      "visual": {
+        "top": 186,
+        "right": 729.46875,
+        "bottom": 698,
+        "left": 21,
+        "width": 708.46875,
+        "height": 512
+      },
+      "prompt": {
+        "top": 186,
+        "right": 1345,
+        "bottom": 698,
+        "left": 741.46875,
+        "width": 603.53125,
+        "height": 512
+      },
+      "canvasH": null,
+      "canvasW": null,
+      "recallLoaded": true,
+      "recallSrc": "/lesson/story/cg_s3_booth.png",
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 15,
+      "workspaceFillRatio": 0.688,
+      "optionCount": 4,
+      "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 225,
+      "figureClips": [],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C03-1366x768",
+      "at": "2026-11-10T14:36:53+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1440,
+      "vh": 900,
+      "question": "C05",
+      "visualType": "recall",
+      "shellH": 900,
+      "workspaceH": 648,
+      "visual": {
+        "top": 194,
+        "right": 768.46875,
+        "bottom": 826,
+        "left": 33,
+        "width": 735.46875,
+        "height": 632
+      },
+      "prompt": {
+        "top": 194,
+        "right": 1407,
+        "bottom": 826,
+        "left": 780.46875,
+        "width": 626.53125,
+        "height": 632
+      },
+      "canvasH": null,
+      "canvasW": null,
+      "recallLoaded": true,
+      "recallSrc": "/lesson/story/cg_exam_ready.png",
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 19,
+      "workspaceFillRatio": 0.72,
+      "optionCount": 6,
+      "optionsInView": true,
+      "gapBelowOptions": 6,
+      "optionMinHeight": 55,
+      "figureClips": [],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C05-1440x900",
+      "at": "2026-11-10T14:36:54+08:00 Asia/Shanghai"
+    },
+    {
+      "vw": 1366,
+      "vh": 768,
+      "question": "C05",
+      "visualType": "recall",
+      "shellH": 768,
+      "workspaceH": 528,
+      "visual": {
+        "top": 186,
+        "right": 729.46875,
+        "bottom": 698,
+        "left": 21,
+        "width": 708.46875,
+        "height": 512
+      },
+      "prompt": {
+        "top": 186,
+        "right": 1345,
+        "bottom": 698,
+        "left": 741.46875,
+        "width": 603.53125,
+        "height": 512
+      },
+      "canvasH": null,
+      "canvasW": null,
+      "recallLoaded": true,
+      "recallSrc": "/lesson/story/cg_exam_ready.png",
+      "stemInView": true,
+      "footerInView": true,
+      "visualInView": true,
+      "gapBelowFooter": 15,
+      "workspaceFillRatio": 0.688,
+      "optionCount": 6,
+      "optionsInView": true,
+      "gapBelowOptions": 2,
+      "optionMinHeight": 40,
+      "figureClips": [],
+      "unselectedYellow": [],
+      "overflowY": 0,
+      "promptScroll": 0,
+      "label": "C05-1366x768",
+      "at": "2026-11-10T14:36:54+08:00 Asia/Shanghai"
+    }
+  ],
+  "notes": [],
+  "studentId": "manual-3844820b3ff1f8e3dcdf75fc",
+  "fakeName": "版式QA_1794292598424"
+}
