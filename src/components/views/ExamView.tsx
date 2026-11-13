@@ -299,7 +299,16 @@ export const ExamView: React.FC<ExamViewProps> = ({
                   {latest && baseComplete && <span className="ml-3 text-slate-300">最近一次：{latest.baseScore} / {latest.baseTotal}</span>}
                 </p>
                 {!baseComplete && <p className="text-amber-200">旧记录已保留。下一份完整答卷将成为有效基础首答。</p>}
-                {baseComplete && <p className="text-slate-300">{first.passed ? '基础层已达标。' : '基础首答已保存。挑战加分不改变基础达标结果。'}</p>}
+                {baseComplete && (first.passed ? (
+                  <p className="text-emerald-300">基础层已达标 —— 可以进入挑战关，也可以直接去玩奖励小游戏。</p>
+                ) : (
+                  <div className="mt-2 rounded-xl border border-rose-400/40 bg-rose-950/40 px-3 py-2">
+                    <p className="font-bold text-rose-200">这次基础层没达标：{first.baseScore} / {first.baseTotal} 题。</p>
+                    <p className="mt-1 text-xs text-rose-200/80">首答成绩已记录。把错题改对后可以再提交一次，也可以从头重做一遍。</p>
+                    <button type="button" onClick={() => { setTier('base'); setIndex(0); }}
+                      className="mt-2 rounded-lg bg-rose-400 px-3 py-1.5 text-xs font-extrabold text-slate-950">回到第 1 题重做</button>
+                  </div>
+                ))}
                 {challengeComplete && <p className="text-purple-200">挑战首答：{first.challengeScore} / {first.challengeTotal}</p>}
                 {initialChallengeSubmitted && !challengeComplete && <p className="text-amber-200">旧版挑战记录未答完整。下一份完整挑战卷将成为有效挑战首答。</p>}
               </div>

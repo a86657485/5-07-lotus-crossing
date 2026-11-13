@@ -334,6 +334,8 @@ export default function App() {
           examOpen={currentSession?.examOpen}
           onEvidence={handleEvidence}
           onExamOpen={() => void handleOpenExam()}
+          rewardUnlocked={currentSession?.rewardUnlocked}
+          onOpenReward={() => setCurrentView('reward_game')}
           onRelicUse={handleUseRelic}
           onS3Detail={detail => {
             if (!currentSession) return;

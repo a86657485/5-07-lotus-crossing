@@ -20,6 +20,9 @@ export type LessonHostProps = {
   onExamOpen: () => void;
   onRelicUse: () => Promise<boolean>;
   onS3Detail?: (detail: S3State) => void;
+  /** 考核达标后在地图上挂一个奖励关入口 */
+  rewardUnlocked?: boolean;
+  onOpenReward?: () => void;
 };
 
 /**
@@ -124,6 +127,15 @@ function GodotEmbeddedView(props: LessonHostProps) {
         allow="autoplay; gamepad; fullscreen"
         onLoad={() => postToGodot('app:session', sessionPayload())}
       />
+      {props.rewardUnlocked && props.onOpenReward && !station && (
+        <button
+          type="button"
+          onClick={props.onOpenReward}
+          className="absolute right-5 bottom-32 z-30 flex items-center gap-2 rounded-2xl border-2 border-amber-200 bg-gradient-to-b from-amber-300 to-orange-500 px-5 py-3 text-base font-extrabold text-slate-950 shadow-2xl transition hover:-translate-y-0.5 hover:shadow-amber-300/40"
+        >
+          <span aria-hidden="true">🎮</span> 进入奖励小游戏
+        </button>
+      )}
       {station && (
         <StationPanel
           key={`${station}-${panelRevision}`}
